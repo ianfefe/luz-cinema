@@ -1,4 +1,4 @@
-"""Gerenciamento do ícone, menus e eventos na bandeja do sistema (System Tray)."""
+"""Gerenciamento de bandeja do sistema (System Tray) para o Luz Cinema v2."""
 from __future__ import annotations
 
 import threading
@@ -7,14 +7,14 @@ from presets_data import DEFAULT_PRESETS
 
 
 class TrayMixin:
-    """Mixin que fornece integração com a área de notificação do Windows via Pystray."""
+    """Mixin que fornece integração rica com a bandeja do Windows no Luz Cinema v2."""
 
     def setup_tray(self):
         try:
             import pystray
             image = create_tray_icon_image()
             menu = self._build_tray_menu()
-            self.tray_icon = pystray.Icon("LuzCinema", image, "Luz Cinema", menu=menu)
+            self.tray_icon = pystray.Icon("LuzCinemaV2", image, "Luz Cinema v2", menu=menu)
             threading.Thread(target=self.tray_icon.run, daemon=True).start()
         except Exception:
             self.tray_icon = None
@@ -32,12 +32,19 @@ class TrayMixin:
         try:
             import pystray
 
-            def make_cinema_action(idx):
+            def make_cinema_action(idx: int):
                 return lambda icon, item: self.start_cinema_from_tray(idx)
 
-            def make_preset_action(preset):
+            def make_scenario_action(sc):
+                return lambda icon, item: self.root.after(0, lambda: self.activate_scenario(sc))
+
+            def make_bulb_action(bulb_id: str, is_on: bool):
+                return lambda icon, item: self.root.after(0, lambda: self.toggle_single_bulb(bulb_id, is_on))
+
+            def make_preset_action(preset: dict):
                 return lambda icon, item: self.activate_preset_from_tray(preset)
 
+            # Submenu: Cinema por monitor
             monitor_items = []
             try:
                 if hasattr(self, "monitors") and self.monitors:
@@ -49,10 +56,41 @@ class TrayMixin:
                 else:
                     monitor_items.append(pystray.MenuItem("Sincronizar (Padrão)", make_cinema_action(0)))
             except Exception as e:
-                logging.warning("Erro ao criar submenu de monitores (v1): %s", e)
+                logging.warning("Erro ao criar submenu de monitores: %s", e)
                 monitor_items = [pystray.MenuItem("Sincronizar (Padrão)", make_cinema_action(0))]
             cinema_submenu = pystray.Menu(*monitor_items)
 
+            # Submenu: Cenários
+            scenario_items = []
+            try:
+                if hasattr(self, "scenarios") and self.scenarios:
+                    for sc in self.scenarios:
+                        icon_str = getattr(sc, "icon", None) or (sc.get("icon", "💡") if isinstance(sc, dict) else "💡")
+                        name_str = getattr(sc, "name", None) or (sc.get("name", "Cenário") if isinstance(sc, dict) else str(sc))
+                        lbl = f"{icon_str} {name_str}".strip()
+                        scenario_items.append(pystray.MenuItem(lbl, make_scenario_action(sc)))
+            except Exception as e:
+                logging.warning("Erro ao criar submenu de cenários: %s", e)
+            scenarios_submenu = pystray.Menu(*scenario_items) if scenario_items else None
+
+            # Submenu: Controle Individual por Lâmpada
+            lamp_items = []
+            try:
+                if hasattr(self, "bulb_controller") and getattr(self.bulb_controller, "devices", None):
+                    for dev in self.bulb_controller.devices.values():
+                        dev_id = getattr(dev, "id", None) or (dev.get("id") if isinstance(dev, dict) else "")
+                        dev_name = getattr(dev, "name", None) or (dev.get("name") if isinstance(dev, dict) else "Lâmpada")
+                        dev_zone = getattr(dev, "zone", None) or (dev.get("zone") if isinstance(dev, dict) else "all")
+                        zone_lbl = str(dev_zone).upper() if dev_zone else "ALL"
+                        lamp_items.append(pystray.MenuItem(f"{dev_name} ({zone_lbl})", pystray.Menu(
+                            pystray.MenuItem("Acender", make_bulb_action(dev_id, True)),
+                            pystray.MenuItem("Apagar", make_bulb_action(dev_id, False)),
+                        )))
+            except Exception as e:
+                logging.warning("Erro ao criar submenu de lâmpadas: %s", e)
+            lamps_submenu = pystray.Menu(*lamp_items) if lamp_items else None
+
+            # Submenu: Presets clássicos e personalizados
             preset_items = []
             try:
                 for p in DEFAULT_PRESETS:
@@ -64,29 +102,34 @@ class TrayMixin:
                         cp_name = cp.get("name") if isinstance(cp, dict) else getattr(cp, "name", "Preset")
                         preset_items.append(pystray.MenuItem(cp_name, make_preset_action(cp)))
             except Exception as e:
-                logging.warning("Erro ao criar submenu de presets (v1): %s", e)
+                logging.warning("Erro ao criar submenu de presets: %s", e)
             presets_submenu = pystray.Menu(*preset_items) if preset_items else None
 
             menu_items = [
-                pystray.MenuItem("Abrir Luz Cinema", self.restore_from_tray, default=True),
+                pystray.MenuItem("Abrir Luz Cinema v2", self.restore_from_tray, default=True),
                 pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Sincronizar Cinema", cinema_submenu),
+                pystray.MenuItem("Sincronizar Cinema Multi-Lâmpadas", cinema_submenu),
             ]
+            if scenarios_submenu:
+                menu_items.append(pystray.MenuItem("Cenários", scenarios_submenu))
+            if lamps_submenu:
+                menu_items.append(pystray.MenuItem("Lâmpadas Individuais", lamps_submenu))
             if presets_submenu:
-                menu_items.append(pystray.MenuItem("Presets", presets_submenu))
+                menu_items.append(pystray.MenuItem("Presets de Cores", presets_submenu))
             menu_items.extend([
-                pystray.MenuItem("Apagar Lâmpada", lambda icon, item: self.root.after(0, self.turn_off_light)),
+                pystray.MenuItem("⏻ Apagar Todas as Lâmpadas", lambda icon, item: self.root.after(0, self.turn_off_all_lights)),
                 pystray.MenuItem("Parar Iluminação", lambda icon, item: self.root.after(0, self.stop)),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Sair", self.quit_app),
             ])
+
             return pystray.Menu(*menu_items)
         except Exception as err:
-            logging.warning("Erro inesperado ao gerar menu completo da bandeja (v1): %s", err, exc_info=True)
+            logging.warning("Erro inesperado ao gerar menu completo da bandeja: %s", err, exc_info=True)
             try:
                 import pystray
                 return pystray.Menu(
-                    pystray.MenuItem("Abrir Luz Cinema", self.restore_from_tray, default=True),
+                    pystray.MenuItem("Abrir Luz Cinema v2", self.restore_from_tray, default=True),
                     pystray.Menu.SEPARATOR,
                     pystray.MenuItem("Parar Iluminação", lambda icon, item: self.root.after(0, self.stop)),
                     pystray.Menu.SEPARATOR,

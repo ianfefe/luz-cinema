@@ -1,4 +1,4 @@
-"""Integração com o Windows: registro de autostart, instância única e proteção DPAPI."""
+"""Integração com o Windows para o Luz Cinema v2: autostart, instância única e DPAPI."""
 from __future__ import annotations
 
 import base64
@@ -10,18 +10,18 @@ import sys
 import winreg
 
 APP_DIR = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).parent
-CONFIG = APP_DIR / "dados" / "preferencias.json"
+CONFIG = APP_DIR / "dados" / "preferencias_v2.json"
 
-APP_REG_NAME = "LuzCinema"
+APP_REG_NAME = "LuzCinemaV2"
 REG_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REG_APPROVED_KEY = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
-WAKE_EVENT_NAME = "LuzCinema_SingleInstance_WakeEvent"
+WAKE_EVENT_NAME = "LuzCinemaV2_SingleInstance_WakeEvent"
 
 _WAKE_EVENT = None
 
 
 def check_single_instance() -> bool:
-    """Garante que apenas uma instância execute. Se uma segunda for aberta, acorda a primeira."""
+    """Garante que apenas uma instância da v2 execute. Se uma segunda for aberta, acorda a primeira."""
     global _WAKE_EVENT
     if os.name != "nt":
         return True
@@ -50,14 +50,15 @@ def get_wake_event():
 
 
 def get_target_app_cmd() -> str:
-    """Retorna a linha de comando entre aspas para iniciar o Luz Cinema na bandeja do Windows."""
+    """Retorna a linha de comando para iniciar o Luz Cinema v2 na bandeja do Windows."""
     if getattr(sys, "frozen", False):
         exe_path = Path(sys.executable).resolve()
         return f'"{exe_path}" --tray'
 
-    exe_candidate = (APP_DIR / "LuzCinema.exe").resolve()
-    if exe_candidate.exists():
-        return f'"{exe_candidate}" --tray'
+    for name in ("LuzCinema_v2.exe", "LuzCinema.exe"):
+        exe_candidate = (APP_DIR / name).resolve()
+        if exe_candidate.exists():
+            return f'"{exe_candidate}" --tray'
 
     py_exe = sys.executable
     pyw = Path(py_exe).with_name("pythonw.exe")
@@ -67,7 +68,7 @@ def get_target_app_cmd() -> str:
 
 
 def is_autostart_enabled() -> bool:
-    """Verifica se o início automático com o Windows está ativo e não bloqueado pelo Gerenciador de Tarefas."""
+    """Verifica se a inicialização com o Windows da v2 está ativa e permitida."""
     if os.name != "nt":
         return False
     try:
@@ -75,7 +76,6 @@ def is_autostart_enabled() -> bool:
             val, _ = winreg.QueryValueEx(key, APP_REG_NAME)
             if not val or not isinstance(val, str):
                 return False
-            # Verifica se o arquivo executável apontado realmente existe no disco
             raw = val.strip()
             exe_part = raw[1:].split('"')[0] if raw.startswith('"') else raw.split()[0]
             if not exe_part or not Path(exe_part).exists():
@@ -85,7 +85,6 @@ def is_autostart_enabled() -> bool:
                 with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_APPROVED_KEY, 0, winreg.KEY_READ) as app_key:
                     approved_val, _ = winreg.QueryValueEx(app_key, APP_REG_NAME)
                     if isinstance(approved_val, (bytes, bytearray)) and len(approved_val) > 0:
-                        # Valores ímpares (ex.: 0x01 ou 0x03) indicam desabilitado no Gerenciador de Tarefas
                         if (approved_val[0] & 1) != 0:
                             return False
             except Exception:
@@ -96,7 +95,7 @@ def is_autostart_enabled() -> bool:
 
 
 def set_autostart(enable: bool):
-    """Ativa ou desativa a inicialização automática no Registro do Windows."""
+    """Ativa ou desativa a inicialização da v2 no Registro do Windows."""
     if os.name != "nt":
         return
     try:
@@ -124,7 +123,7 @@ def set_autostart(enable: bool):
 
 
 def protect(text: str, decrypt: bool = False) -> str:
-    """Criptografa ou descriptografa dados vinculados ao usuário atual do Windows via DPAPI."""
+    """Criptografa ou descriptografa dados via DPAPI do Windows."""
     if os.name != "nt":
         raise ValueError("Armazenamento protegido disponível somente no Windows.")
 
@@ -147,7 +146,7 @@ def protect(text: str, decrypt: bool = False) -> str:
 
 
 def setup_windows_dpi_and_app_id():
-    """Configura percepção de DPI e AppUserModelID para ícone na barra de tarefas."""
+    """Configura percepção de DPI e AppUserModelID da v2."""
     if os.name != "nt":
         return
     try:
@@ -155,6 +154,6 @@ def setup_windows_dpi_and_app_id():
     except (AttributeError, OSError):
         pass
     try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LuzCinema.App")
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LuzCinema.App.v2")
     except (AttributeError, OSError):
         pass

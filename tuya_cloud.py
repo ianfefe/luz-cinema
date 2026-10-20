@@ -52,6 +52,25 @@ def make_manager(session):
     return manager
 
 
+def query_account_devices(session=None) -> list[dict]:
+    """Retorna os dispositivos da conta Tuya para seleção de múltiplas lâmpadas."""
+    try:
+        sess = deepcopy(session) if session else load_session()
+        mgr = make_manager(sess)
+        devices = mgr.device_repository.devices.values()
+        results = []
+        for d in devices:
+            results.append({
+                "id": d.id,
+                "name": getattr(d, "name", "Lâmpada Tuya") or "Lâmpada Tuya",
+                "online": bool(getattr(d, "online", True)),
+                "category": str(getattr(d, "category", "light")),
+            })
+        return results
+    except Exception:
+        return []
+
+
 class CloudBulb:
     min_interval = 0.25
 

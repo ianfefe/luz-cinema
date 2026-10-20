@@ -6,7 +6,8 @@ binaries = []
 hiddenimports = [
     'qrcode.image.pil', 'pystray', 'six', 'presets_data',
     'win_platform', 'icon_utils', 'color_wheel', 'ui_theme',
-    'tray_manager', 'tab_views', 'tuya_cloud', 'vincular_tuya', 'core'
+    'tray_manager', 'tab_views', 'tuya_cloud', 'vincular_tuya',
+    'core', 'multi_bulb', 'scenarios'
 ]
 
 for pkg in ('mss', 'tinytuya', 'tuya_sharing', 'pystray'):
