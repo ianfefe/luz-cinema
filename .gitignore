@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller / Build outputs
+build/
+build_v2/
+dist/
+*.spec.bak
+
+# Credenciais, Sessões e Arquivos Sensíveis (NUNCA COMMITTAR)
+*.enc
+dados/*.enc
+.env
+*.env
+*.key
+*.pem
+local-discovery.json
+preferencias.json
+preferencias_v2.json
+dados/preferencias.json
+dados/preferencias_v2.json
+
+# Binários pesados gerados localmente (distribuídos via GitHub Releases)
+*.exe
+*.zip
+
+# Ambientes virtuais e dependências locais
+ambiente/
+ambiente-libs/
+tuya-libs/
+venv/
+.venv/
+env/
+
+# IDE e Sistema Operacional
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+Desktop.ini
