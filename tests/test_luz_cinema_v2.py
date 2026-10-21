@@ -158,7 +158,8 @@ class TestLuzCinemaV2(unittest.TestCase):
                 self.assertGreaterEqual(app.lamps_listbox.size(), 1)
 
                 # Testa ativação de cenário pela interface
-                app.activate_scenario(DEFAULT_SCENARIOS[0])
+                with patch.object(app.bulb_controller, "apply_scenario"):
+                    app.activate_scenario(DEFAULT_SCENARIOS[0])
                 self.assertIn("Setup Cinema", app.status.get())
 
                 # Salva cenário personalizado
@@ -263,6 +264,33 @@ class TestLuzCinemaV2(unittest.TestCase):
                 self.assertIsNotNone(hmenu, "HMENU nativo deve ser alocado pelo Windows")
                 self.assertGreater(hmenu, 0, "Handle HMENU deve ser válido (>0)")
                 self.assertGreater(len(callbacks), 0, "Lista de callbacks do menu deve ser populada")
+
+                root.update()
+                app.close()
+
+    def test_cinema_calibration_profiles(self):
+        from presets_data import CINEMA_PROFILES
+        self.assertEqual(len(CINEMA_PROFILES), 6)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_cfg = Path(tmp_dir) / "prefs_v2.json"
+            with patch.object(gui_v2, "CONFIG", tmp_cfg):
+                root = tk.Tk()
+                root.withdraw()
+                app = gui_v2.App(root)
+
+                for prof in CINEMA_PROFILES:
+                    app.apply_cinema_profile(prof)
+                    self.assertAlmostEqual(app.brightness.get(), prof["brightness"])
+                    self.assertAlmostEqual(app.saturation.get(), prof["saturation"])
+                    self.assertAlmostEqual(app.standout.get(), prof["standout"])
+                    self.assertAlmostEqual(app.smoothing.get(), prof["smoothing"])
+                    self.assertAlmostEqual(app.interval.get(), prof["interval"])
+                    self.assertEqual(app.crop.get(), prof["crop"])
+                    self.assertAlmostEqual(app.dark_percent.get(), prof["dark_percent"])
+                    self.assertEqual(app.off_on_neutral.get(), prof["off_on_neutral"])
+                    self.assertEqual(app.flash_boost.get(), prof["flash_boost"])
+                    self.assertEqual(app.light_mode.get(), prof["light_mode"])
+                    self.assertIn(prof["name"], app.status.get())
 
                 root.update()
                 app.close()

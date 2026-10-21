@@ -221,6 +221,25 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
         self.timer = self.root.after(100, self.drain)
 
     # ---------------------------------------------------------
+    # Perfis de Calibração Rápida de Cinema & Jogos
+    # ---------------------------------------------------------
+    def apply_cinema_profile(self, profile: dict):
+        """Aplica instantaneamente um perfil de calibração para o Modo Cinema."""
+        self.brightness.set(float(profile.get("brightness", 75.0)))
+        self.saturation.set(float(profile.get("saturation", 185.0)))
+        self.standout.set(float(profile.get("standout", 90.0)))
+        self.smoothing.set(float(profile.get("smoothing", 0.04)))
+        self.interval.set(float(profile.get("interval", 0.05)))
+        self.crop.set(int(profile.get("crop", 12)))
+        self.dark_percent.set(float(profile.get("dark_percent", 5.0)))
+        self.off_on_neutral.set(bool(profile.get("off_on_neutral", True)))
+        self.flash_boost.set(bool(profile.get("flash_boost", True)))
+        self.light_mode.set(bool(profile.get("light_mode", False)))
+
+        self.save_settings()
+        self.status.set(f"Perfil de calibração '{profile.get('name')}' aplicado com sucesso!")
+
+    # ---------------------------------------------------------
     # Controle de Cenários e Múltiplas Lâmpadas
     # ---------------------------------------------------------
     def activate_scenario(self, scenario: Scenario):

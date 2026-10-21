@@ -6,7 +6,7 @@ from tkinter import ttk, messagebox, simpledialog
 import webbrowser
 
 from color_wheel import ColorWheel
-from presets_data import DEFAULT_PRESETS
+from presets_data import DEFAULT_PRESETS, CINEMA_PROFILES
 from scenarios import DEFAULT_SCENARIOS, Scenario
 from multi_bulb import BulbDevice
 from win_platform import APP_DIR
@@ -150,6 +150,23 @@ class TabViewsMixin:
         self.cinema_lamps_container = ttk.Frame(lamps_frame)
         self.cinema_lamps_container.pack(fill="x")
         self.refresh_cinema_lamps_ui()
+
+        # Perfis Rápidos de Calibração (1 Clique)
+        profiles_frame = ttk.LabelFrame(page, text=" ⚡ Perfis Prontos de Calibração (1 Clique) ", padding=(6, 6))
+        profiles_frame.pack(fill="x", pady=(0, 10))
+
+        prof_row = ttk.Frame(profiles_frame)
+        prof_row.pack(fill="x")
+        for i in range(len(CINEMA_PROFILES)):
+            prof_row.columnconfigure(i, weight=1)
+
+        for idx, prof in enumerate(CINEMA_PROFILES):
+            btn = ttk.Button(
+                prof_row,
+                text=prof["short_name"],
+                command=lambda p=prof: self.apply_cinema_profile(p),
+            )
+            btn.grid(row=0, column=idx, padx=2, pady=2, sticky="ew")
 
         # Sliders de Calibração
         self.slider(page, "Brilho máximo", self.brightness, 5, 100, "%")

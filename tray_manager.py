@@ -105,11 +105,26 @@ class TrayMixin:
                 logging.warning("Erro ao criar submenu de presets: %s", e)
             presets_submenu = pystray.Menu(*preset_items) if preset_items else None
 
+            # Submenu: Perfis de Calibração
+            profiles_submenu = None
+            try:
+                from presets_data import CINEMA_PROFILES
+                prof_items = []
+                for prof in CINEMA_PROFILES:
+                    def make_prof_action(p=prof):
+                        return lambda icon, item: self.root.after(0, lambda: self.apply_cinema_profile(p))
+                    prof_items.append(pystray.MenuItem(prof["name"], make_prof_action(prof)))
+                profiles_submenu = pystray.Menu(*prof_items) if prof_items else None
+            except Exception as e:
+                logging.warning("Erro ao criar submenu de perfis: %s", e)
+
             menu_items = [
                 pystray.MenuItem("Abrir Luz Cinema v2", self.restore_from_tray, default=True),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Sincronizar Cinema Multi-Lâmpadas", cinema_submenu),
             ]
+            if profiles_submenu:
+                menu_items.append(pystray.MenuItem("Perfis de Cinema & Jogos", profiles_submenu))
             if scenarios_submenu:
                 menu_items.append(pystray.MenuItem("Cenários", scenarios_submenu))
             if lamps_submenu:
