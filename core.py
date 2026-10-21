@@ -4,6 +4,7 @@ from __future__ import annotations
 import colorsys
 import ipaddress
 import math
+import threading
 from dataclasses import dataclass, replace
 
 from PIL import Image
@@ -302,7 +303,7 @@ class BulbError(Exception):
 
 
 class LocalBulb:
-    """One connection, one owning worker, bounded retries, captured-state restore."""
+    """One connection, bounded retries, thread-safe, self-healing, captured-state restore."""
     def __init__(self, device_id, ip, key, version, factory=None):
         if not device_id.strip() or len(key.encode("utf-8")) != 16:
             raise BulbError("Preencha o ID e a chave local de 16 bytes da lâmpada.")
@@ -317,16 +318,25 @@ class LocalBulb:
         if factory is None:
             import tinytuya
             factory = tinytuya.BulbDevice
-        self.device = factory(device_id.strip(), str(address), key)
+
+        self.device_id = device_id.strip()
+        self.ip = str(address)
+        self.key = key
+        self.version = float(version)
+        self.factory = factory
+        self._lock = threading.Lock()
+
         self.original = {}
         self.switch_dp = None
         self.off = False
+        self.device = self.factory(self.device_id, self.ip, self.key)
+
         try:
-            self.device.set_socketTimeout(2)
+            self.device.set_socketTimeout(1.5)
             self.device.set_socketRetryLimit(1)
-            self.device.set_socketRetryDelay(0.2)
+            self.device.set_socketRetryDelay(0.1)
             self.device.set_socketPersistent(True)
-            self.device.set_version(float(version))
+            self.device.set_version(self.version)
             status = self.device.status()
             self.check(status)
             if not isinstance(status, dict) or not isinstance(status.get("dps"), dict):
@@ -345,6 +355,29 @@ class LocalBulb:
             self.device.close()
             raise
 
+    def reconnect(self) -> bool:
+        """Restaura a conexão socket com o dispositivo em caso de queda de rede."""
+        with self._lock:
+            return self._reconnect_unlocked()
+
+    def _reconnect_unlocked(self) -> bool:
+        try:
+            if hasattr(self, "device") and self.device:
+                try:
+                    self.device.close()
+                except Exception:
+                    pass
+            self.device = self.factory(self.device_id, self.ip, self.key)
+            self.device.set_socketTimeout(1.5)
+            self.device.set_socketRetryLimit(1)
+            self.device.set_socketRetryDelay(0.1)
+            self.device.set_socketPersistent(True)
+            self.device.set_version(self.version)
+            st = self.device.status()
+            return isinstance(st, dict) and "dps" in st
+        except Exception:
+            return False
+
     @staticmethod
     def check(result):
         if result is None or not isinstance(result, dict) or "Error" in result or "Err" in result:
@@ -358,6 +391,17 @@ class LocalBulb:
         return calc_cct_values(rgb, 100, 100)
 
     def color(self, rgb, light_mode=False):
+        with self._lock:
+            try:
+                self._send_color_internal(rgb, light_mode=light_mode)
+            except Exception:
+                # Se falhar por queda de conexão ou socket corrompido, tenta auto-recuperar uma vez
+                if self._reconnect_unlocked():
+                    self._send_color_internal(rgb, light_mode=light_mode)
+                else:
+                    raise
+
+    def _send_color_internal(self, rgb, light_mode=False):
         if max(rgb) <= 2:
             if not self.off:
                 self.check(self.device.turn_off())
@@ -389,6 +433,16 @@ class LocalBulb:
             self.off = False
 
     def set_manual(self, mode, rgb=None, brightness=100, temp=100):
+        with self._lock:
+            try:
+                self._send_manual_internal(mode, rgb=rgb, brightness=brightness, temp=temp)
+            except Exception:
+                if self._reconnect_unlocked():
+                    self._send_manual_internal(mode, rgb=rgb, brightness=brightness, temp=temp)
+                else:
+                    raise
+
+    def _send_manual_internal(self, mode, rgb=None, brightness=100, temp=100):
         if mode == "off":
             self.check(self.device.turn_off())
             self.off = True
@@ -405,11 +459,19 @@ class LocalBulb:
             self.off = False
 
     def restore(self):
-        if self.original:
-            self.check(self.device.set_multiple_values(self.original))
+        with self._lock:
+            if self.original:
+                try:
+                    self.check(self.device.set_multiple_values(self.original))
+                except Exception:
+                    pass
 
     def close(self):
-        self.device.close()
+        with self._lock:
+            try:
+                self.device.close()
+            except Exception:
+                pass
 
 
 def crop_zone(frame: Image.Image, zone: str, crop_percent: int = 10) -> Image.Image:

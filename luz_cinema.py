@@ -420,6 +420,8 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
             self.debounced_apply_manual()
 
     def debounced_apply_manual(self):
+        if self.running:
+            self.stop(restore=False)
         if hasattr(self, "_live_timer") and self._live_timer:
             self.root.after_cancel(self._live_timer)
         self._live_timer = self.root.after(60, self.apply_current_manual)
@@ -452,6 +454,10 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
         return None
 
     def apply_current_manual(self):
+        if self.running:
+            self.stop(restore=False)
+            if self.worker and self.worker.is_alive():
+                self.worker.join(timeout=0.3)
         target_ids = self._get_target_bulb_ids()
         mode = self.manual_mode.get()
         rgb = self.get_current_manual_rgb()
@@ -642,11 +648,12 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
             with MSS() as capture:
                 while not self.stop_event.is_set():
                     started = time.monotonic()
+                    current_settings = self.settings()
                     shot = capture.grab(monitor)
                     frame = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
 
                     # Extrai e calcula a cor de cada setor da tela de forma ultrarrápida
-                    zone_colors = compute_zones_colors(frame, settings, required_zones, was_dark_map)
+                    zone_colors = compute_zones_colors(frame, current_settings, required_zones, was_dark_map)
                     for z, col in zone_colors.items():
                         was_dark_map[z] = max(col) == 0
 
@@ -657,10 +664,10 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
                     previous = started
 
                     if real:
-                        self.bulb_controller.dispatch_cinema_frame(zone_colors, light_mode=settings.light_mode, dt=dt, smoothing=settings.smoothing)
+                        self.bulb_controller.dispatch_cinema_frame(zone_colors, light_mode=current_settings.light_mode, dt=dt, smoothing=current_settings.smoothing)
 
                     self.events.put(("zones_colors", zone_colors))
-                    self.stop_event.wait(max(0, settings.interval - (time.monotonic() - started)))
+                    self.stop_event.wait(max(0, current_settings.interval - (time.monotonic() - started)))
 
             if real:
                 self.bulb_controller.restore_all()
@@ -674,6 +681,7 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
         self.bulb_controller.skip_restore_on_stop = not restore
         self.stop_event.set()
         self.stop_button.configure(state="disabled")
+        self.bulb_controller.stop_cinema()
         self.status.set("Parando e restaurando lâmpadas…" if restore else "Parando sincronização…")
         if not restore:
             self.running = False

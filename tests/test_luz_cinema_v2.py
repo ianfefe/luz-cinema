@@ -295,6 +295,33 @@ class TestLuzCinemaV2(unittest.TestCase):
                 root.update()
                 app.close()
 
+    def test_in_flight_drop_and_recovery(self):
+        """Verifica que frames concorrentes são descartados para não sobrecarregar o socket nem criar fila."""
+        import time
+        bulb = BulbDevice(id="test_b1", name="Abajur Teste", zone="all")
+        controller = MultiBulbController([bulb])
+
+        class SlowFakeBulb:
+            def __init__(self):
+                self.calls = []
+            def color(self, rgb, light_mode=False):
+                self.calls.append(rgb)
+                time.sleep(0.04)
+
+        slow = SlowFakeBulb()
+        controller.active_connections["test_b1"] = slow
+
+        # Despacha 5 frames em sequência ultrarrápida
+        for i in range(5):
+            controller.dispatch_cinema_frame({"all": (i * 40, 100, 150)}, dt=0.01, smoothing=0.0)
+
+        # Como a lâmpada demora 0.04s, frames intermediários devem ter sido descartados
+        self.assertLess(len(slow.calls), 5, "Frames concorrentes devem ser descartados sem enfileirar atrasos")
+
+        time.sleep(0.06)
+        controller.stop_cinema()
+        self.assertEqual(len(controller._in_flight), 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
