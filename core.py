@@ -24,7 +24,7 @@ class Settings:
 
     def __post_init__(self):
         limits = {"brightness": (0.05, 1), "saturation": (0, 3), "standout": (0, 1),
-                  "smoothing": (0.05, 4), "interval": (0.25, 2),
+                  "smoothing": (0.0, 4), "interval": (0.02, 2),
                   "crop_percent": (0, 35), "dark_percent": (0, 20)}
         for field, (low, high) in limits.items():
             value = getattr(self, field)
@@ -276,8 +276,8 @@ class Smoother:
         if max(target) == 0:
             self.value = (0.0, 0.0, 0.0)
             return (0, 0, 0)
-        # Intense white flash (flashbang) bursts instantly without lag
-        if min(target) >= 245:
+        # Intense white flash (flashbang) bursts instantly without lag, or zero smoothing
+        if min(target) >= 245 or tau <= 0.01:
             self.value = tuple(float(v) for v in target)
             return target
         alpha = 1 - math.exp(-min(max(dt, 0), 1) / tau)

@@ -59,12 +59,24 @@ class TabViewsMixin:
         row.pack(fill="x", pady=4)
         row.columnconfigure(1, weight=1)
         ttk.Label(row, text=label, width=28).grid(row=0, column=0, sticky="w")
-        value_label = ttk.Label(row, width=8)
+        value_label = ttk.Label(row, width=18)
         value_label.grid(row=0, column=2, padx=(8, 0))
 
         def display(*_):
-            n = variable.get()
-            value_label.configure(text=(f"{n:.1f}" if unit == " s" else f"{n:.0f}") + unit)
+            try:
+                n = float(variable.get())
+            except (ValueError, TypeError):
+                n = 0.0
+            if unit == " s":
+                if n <= 0.01:
+                    value_label.configure(text="0.00 s (Instantâneo)")
+                elif n <= 0.25:
+                    fps = round(1.0 / n) if n > 0 else 0
+                    value_label.configure(text=f"{n:.2f} s ({fps} FPS)")
+                else:
+                    value_label.configure(text=f"{n:.2f} s")
+            else:
+                value_label.configure(text=f"{n:.0f}{unit}")
 
         display()
         variable.trace_add("write", display)
@@ -143,7 +155,8 @@ class TabViewsMixin:
         self.slider(page, "Brilho máximo", self.brightness, 5, 100, "%")
         self.slider(page, "Vibração das cores", self.saturation, 50, 250, "%")
         self.slider(page, "Foco no destaque da tela", self.standout, 0, 100, "%")
-        self.slider(page, "Suavidade da transição", self.smoothing, 0.05, 3, " s")
+        self.slider(page, "Suavidade da transição", self.smoothing, 0.0, 2.0, " s")
+        self.slider(page, "Velocidade de captura (FPS)", self.interval, 0.03, 0.50, " s")
         self.slider(page, "Recorte em cima e embaixo", self.crop, 0, 30, "%")
         self.slider(page, "Apagar cenas abaixo de", self.dark_percent, 0, 15, "%")
 
@@ -476,6 +489,7 @@ class TabViewsMixin:
         ip_var = tk.StringVar()
         id_var = tk.StringVar()
         key_var = tk.StringVar()
+        version_var = tk.StringVar(value="3.5")
         zone_var = tk.StringVar(value="all")
 
         fields = [
@@ -488,8 +502,11 @@ class TabViewsMixin:
             ttk.Label(form, text=label).grid(row=idx, column=0, sticky="w", pady=4)
             ttk.Entry(form, textvariable=var).grid(row=idx, column=1, sticky="ew", pady=4)
 
-        ttk.Label(form, text="Zona no Cinema:").grid(row=4, column=0, sticky="w", pady=4)
-        ttk.Combobox(form, textvariable=zone_var, values=ZONE_KEYS, state="readonly", width=14).grid(row=4, column=1, sticky="w", pady=4)
+        ttk.Label(form, text="Versão protocolo:").grid(row=4, column=0, sticky="w", pady=4)
+        ttk.Combobox(form, textvariable=version_var, values=["3.5", "3.4", "3.3", "3.1"], state="readonly", width=8).grid(row=4, column=1, sticky="w", pady=4)
+
+        ttk.Label(form, text="Zona no Cinema:").grid(row=5, column=0, sticky="w", pady=4)
+        ttk.Combobox(form, textvariable=zone_var, values=ZONE_KEYS, state="readonly", width=14).grid(row=5, column=1, sticky="w", pady=4)
 
         def _save():
             if not ip_var.get().strip() or not id_var.get().strip():
@@ -501,6 +518,7 @@ class TabViewsMixin:
                 connection_type="local",
                 ip=ip_var.get().strip(),
                 key=key_var.get().strip(),
+                version=version_var.get().strip() or "3.5",
                 zone=zone_var.get(),
             )
             self.bulb_controller.devices[dev.id] = dev

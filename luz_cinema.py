@@ -109,8 +109,8 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
         self.brightness = tk.DoubleVar(value=45)
         self.saturation = tk.DoubleVar(value=140)
         self.standout = tk.DoubleVar(value=100)
-        self.smoothing = tk.DoubleVar(value=0.1)
-        self.interval = tk.StringVar(value="0.25")
+        self.smoothing = tk.DoubleVar(value=0.0)
+        self.interval = tk.DoubleVar(value=0.05)
         self.crop = tk.DoubleVar(value=10)
         self.dark_percent = tk.DoubleVar(value=5)
         self.off_on_neutral = tk.BooleanVar(value=True)
@@ -705,7 +705,7 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
                 "saturation": settings.saturation * 100,
                 "standout": settings.standout * 100,
                 "smoothing": settings.smoothing,
-                "interval": str(settings.interval),
+                "interval": float(settings.interval),
                 "crop": settings.crop_percent,
                 "dark_percent": settings.dark_percent,
                 "off_on_neutral": settings.off_on_neutral,
@@ -777,8 +777,8 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
             self.brightness.set(float(data.get("brightness", 45)))
             self.saturation.set(float(data.get("saturation", 140)))
             self.standout.set(float(data.get("standout", 100)))
-            self.smoothing.set(float(data.get("smoothing", 0.1)))
-            self.interval.set(str(data.get("interval", "0.25")))
+            self.smoothing.set(float(data.get("smoothing", 0.0)))
+            self.interval.set(float(data.get("interval", 0.05)))
             self.crop.set(int(data.get("crop", 10)))
             self.dark_percent.set(float(data.get("dark_percent", 5)))
             self.off_on_neutral.set(bool(data.get("off_on_neutral", True)))

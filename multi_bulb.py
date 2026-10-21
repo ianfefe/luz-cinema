@@ -19,7 +19,7 @@ class BulbDevice:
     connection_type: str = "cloud"  # 'cloud' ou 'local'
     ip: str = ""
     key: str = ""
-    version: str = "3.3"
+    version: str = "3.5"
     zone: str = "all"  # 'all', 'left', 'right', 'top', 'bottom', 'center', 'none'
     enabled: bool = True
     last_color_hex: str = "#8b7bff"
@@ -36,7 +36,7 @@ class BulbDevice:
             connection_type=data.get("connection_type", "cloud"),
             ip=data.get("ip", ""),
             key=data.get("key", ""),
-            version=data.get("version", "3.3"),
+            version=data.get("version", "3.5"),
             zone=data.get("zone", "all"),
             enabled=bool(data.get("enabled", True)),
             last_color_hex=data.get("last_color_hex", "#8b7bff"),
@@ -85,7 +85,7 @@ class MultiBulbController:
                 from tuya_cloud import CloudBulb
                 conn = CloudBulb(device_id=device.id)
             else:
-                conn = LocalBulb(device.name, device.ip, device.key, device.version)
+                conn = LocalBulb(device.id, device.ip, device.key, device.version)
             self.active_connections[bid] = conn
             if bid not in self.smoothers:
                 self.smoothers[bid] = Smoother()
@@ -235,3 +235,7 @@ class MultiBulbController:
                 self._close_one(bid)
             self.smoothers.clear()
             self.last_sent.clear()
+            try:
+                self._executor.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                pass
