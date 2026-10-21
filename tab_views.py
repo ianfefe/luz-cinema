@@ -107,41 +107,33 @@ class TabViewsMixin:
         except Exception:
             self.status.set("Não foi possível listar as telas. Verifique a sessão do Windows.")
 
-        # Ambilight Multi-Zona Visual Preview (Canvas simulando tela com Lado Esquerdo, Centro e Lado Direito)
-        preview_box = ttk.LabelFrame(page, text=" Prévia Ambilight Multi-Zona ", padding=8)
+        # Ambilight Multi-Zona Visual Preview (Simulação em tempo real com todas as zonas espaciais)
+        preview_box = ttk.LabelFrame(page, text=" Prévia Ambilight Multi-Zona em Tempo Real ", padding=8)
         preview_box.pack(fill="x", pady=(0, 10))
 
         zones_container = ttk.Frame(preview_box)
         zones_container.pack(fill="x")
-        zones_container.columnconfigure(0, weight=1)
-        zones_container.columnconfigure(1, weight=1)
-        zones_container.columnconfigure(2, weight=1)
+        for c in range(6):
+            zones_container.columnconfigure(c, weight=1)
 
         self.zone_swatches = {}
 
-        # Zona Esquerda
-        f_left = ttk.Frame(zones_container)
-        f_left.grid(row=0, column=0, sticky="nsew", padx=2)
-        ttk.Label(f_left, text="◀ Esquerda", style="Muted.TLabel").pack()
-        sw_left = tk.Canvas(f_left, height=48, bg="#1a1f33", highlightthickness=1, highlightbackground=t["BORDER"])
-        sw_left.pack(fill="x")
-        self.zone_swatches["left"] = sw_left
+        zones_ui_config = [
+            ("left", "◀ Esquerda", "#1a1f33"),
+            ("top", "▲ Topo/Teto", "#1a1f33"),
+            ("center", "🎯 Centro", "#1a1f33"),
+            ("bottom", "▼ Base", "#1a1f33"),
+            ("right", "Direita ▶", "#1a1f33"),
+            ("all", "⬛ Tela Inteira", "#1a1f33"),
+        ]
 
-        # Zona Centro / Geral
-        f_all = ttk.Frame(zones_container)
-        f_all.grid(row=0, column=1, sticky="nsew", padx=2)
-        ttk.Label(f_all, text="⬛ Geral / Centro", style="Muted.TLabel").pack()
-        sw_all = tk.Canvas(f_all, height=48, bg="#1a1f33", highlightthickness=1, highlightbackground=t["BORDER"])
-        sw_all.pack(fill="x")
-        self.zone_swatches["all"] = sw_all
-
-        # Zona Direita
-        f_right = ttk.Frame(zones_container)
-        f_right.grid(row=0, column=2, sticky="nsew", padx=2)
-        ttk.Label(f_right, text="Direita ▶", style="Muted.TLabel").pack()
-        sw_right = tk.Canvas(f_right, height=48, bg="#1a1f33", highlightthickness=1, highlightbackground=t["BORDER"])
-        sw_right.pack(fill="x")
-        self.zone_swatches["right"] = sw_right
+        for col_idx, (z_key, z_label, def_bg) in enumerate(zones_ui_config):
+            f_col = ttk.Frame(zones_container)
+            f_col.grid(row=0, column=col_idx, sticky="nsew", padx=2)
+            ttk.Label(f_col, text=z_label, style="Muted.TLabel").pack()
+            sw = tk.Canvas(f_col, height=44, bg=def_bg, highlightthickness=1, highlightbackground=t["BORDER"])
+            sw.pack(fill="x")
+            self.zone_swatches[z_key] = sw
 
         # Mapeamento Espacial de Lâmpadas no Cinema
         lamps_frame = ttk.LabelFrame(page, text=" Distribuição das Lâmpadas na Sala / Tela ", padding=8)

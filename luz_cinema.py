@@ -636,7 +636,7 @@ class App(TabViewsMixin, TrayMixin, ThemeMixin):
                 self.events.put(("status", "Prévia multi-zona ativa na tela. Nenhum comando enviado."))
 
             was_dark_map = {}
-            required_zones = self.bulb_controller.get_required_zones() | {"left", "right", "all"}
+            required_zones = self.bulb_controller.get_required_zones() | {"left", "right", "top", "bottom", "center", "all"}
             previous = time.monotonic()
 
             with MSS() as capture:
