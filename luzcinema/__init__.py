@@ -4,4 +4,4 @@ Um único app (``luz_cinema.py``): com uma lâmpada a interface fica enxuta; com
 aparecem as zonas da tela e o controle por lâmpada.
 """
 
-__version__ = "3.1.0"
+__version__ = "3.0.0"
