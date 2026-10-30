@@ -7,6 +7,7 @@ import time
 
 from ..core import rgb_to_hex
 from ..presets import CINEMA_PROFILES, DEFAULT_PRESETS
+from ..windows import APP_REG_NAME
 from .icons import create_tray_icon_image
 
 log = logging.getLogger(__name__)
@@ -29,8 +30,8 @@ class Tray:
     def start(self):
         try:
             import pystray
-            self.icon = pystray.Icon(self.app.edition.reg_name, create_tray_icon_image(),
-                                     self.app.edition.title, menu=self._menu())
+            self.icon = pystray.Icon(APP_REG_NAME, create_tray_icon_image(),
+                                     "Luz Cinema", menu=self._menu())
             threading.Thread(target=self.icon.run, daemon=True, name="Bandeja").start()
         except Exception:
             log.warning("Bandeja do sistema indisponível", exc_info=True)
@@ -55,7 +56,7 @@ class Tray:
         if self.icon and not self._notified and getattr(self.icon, "HAS_NOTIFICATION", False):
             self._notified = True
             try:
-                self.icon.notify(message, self.app.edition.title)
+                self.icon.notify(message, "Luz Cinema")
             except Exception:
                 pass
 
@@ -96,7 +97,7 @@ class Tray:
             preset_items += [Item(p.get("name", "Cor"), self._ui(app.apply_preset, p)) for p in app.custom_presets]
 
         items = [
-            Item(f"Abrir {app.edition.title}", self._ui(app.show_window), default=True),
+            Item("Abrir Luz Cinema", self._ui(app.show_window), default=True),
             Menu.SEPARATOR,
             Item("▶ Iniciar modo cinema", cinema_menu),
             Item("■ Parar modo cinema", self._ui(app.stop_cinema), enabled=lambda _: app.running),
@@ -106,7 +107,7 @@ class Tray:
             Item("Cores", Menu(*preset_items)),
         ]
         devices = app.controller.device_list()
-        if app.edition.multi and devices:
+        if len(devices) > 1:
             items.append(Item("Lâmpadas", Menu(*[
                 Item(d.name, Menu(Item("Acender", self._ui(app.set_power, True, [d.id])),
                                   Item("Apagar", self._ui(app.set_power, False, [d.id]))))

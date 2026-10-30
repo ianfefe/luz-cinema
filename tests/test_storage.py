@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from luzcinema import storage  # noqa: E402
 from luzcinema.devices import BulbDevice  # noqa: E402
-from luzcinema.edition import MULTI, SIMPLE  # noqa: E402
 
 KEY = "gdHiGO{Xuy&}a#C4"
 
@@ -19,15 +18,22 @@ class StorageTests(unittest.TestCase):
         self.dir = Path(tempfile.mkdtemp())
 
     def test_roundtrip_never_writes_plain_key(self):
-        data = dict(storage.DEFAULTS, devices=[BulbDevice("id1", "Abajur", "local", "192.168.0.9", KEY, zone="left")])
-        storage.save(MULTI, data, self.dir)
-        raw = (self.dir / MULTI.config_name).read_text(encoding="utf-8")
+        data = dict(storage.DEFAULTS, devices=[BulbDevice("id1", "Abajur", "local", "192.168.0.9", KEY, zone="left"),
+                                               BulbDevice("id2", "Teto", zone="top")])
+        storage.save(data, self.dir)
+        raw = (self.dir / storage.CONFIG_NAME).read_text(encoding="utf-8")
         self.assertNotIn(KEY, raw)
         self.assertIn("protected_key", raw)
-        loaded, migrated = storage.load(MULTI, self.dir)
+        loaded, migrated = storage.load(self.dir)
         self.assertFalse(migrated)
         self.assertEqual(loaded["devices"][0].key, KEY)
-        self.assertEqual(loaded["devices"][0].zone, "left")
+        self.assertEqual([d.zone for d in loaded["devices"]], ["left", "top"])
+
+    def test_single_lamp_always_follows_whole_screen(self):
+        (self.dir / storage.CONFIG_NAME).write_text(json.dumps(
+            {"devices": [{"id": "a", "zone": "left", "enabled": False}]}), encoding="utf-8")
+        data, _ = storage.load(self.dir)
+        self.assertEqual([(d.zone, d.enabled) for d in data["devices"]], [("all", True)])
 
     def test_migrates_v2_preferences(self):
         legacy = {"devices": [
@@ -36,18 +42,29 @@ class StorageTests(unittest.TestCase):
              "zone": "right", "enabled": True}],
             "brightness": 35.0, "theme_mode": "light", "interval": 0.04}
         (self.dir / storage.LEGACY_V2).write_text(json.dumps(legacy), encoding="utf-8")
-        simple, migrated = storage.load(SIMPLE, self.dir)
+        data, migrated = storage.load(self.dir)
         self.assertTrue(migrated)
-        self.assertEqual([d.id for d in simple["devices"]], ["b"])  # só uma, priorizando a ativa
-        self.assertEqual(simple["devices"][0].zone, "all")
-        self.assertEqual(simple["devices"][0].key, KEY)
-        self.assertEqual((simple["brightness"], simple["theme_mode"]), (35.0, "light"))
-        multi, _ = storage.load(MULTI, self.dir)
-        self.assertEqual(len(multi["devices"]), 2)
+        self.assertEqual([(d.id, d.zone, d.enabled) for d in data["devices"]],
+                         [("a", "left", False), ("b", "right", True)])
+        self.assertEqual(data["devices"][1].key, KEY)
+        self.assertEqual((data["brightness"], data["theme_mode"]), (35.0, "light"))
+
+    def test_migrates_3_0_editions_preferring_simple(self):
+        (self.dir / "preferencias_multi.json").write_text(json.dumps(
+            {"devices": [{"id": "m1"}, {"id": "m2"}], "brightness": 80.0}), encoding="utf-8")
+        (self.dir / "preferencias_simples.json").write_text(json.dumps(
+            {"devices": [{"id": "s1"}], "brightness": 60.0}), encoding="utf-8")
+        (self.dir / storage.LEGACY_V2).write_text(json.dumps({"brightness": 10.0}), encoding="utf-8")
+        data, migrated = storage.load(self.dir)
+        self.assertTrue(migrated)
+        self.assertEqual(([d.id for d in data["devices"]], data["brightness"]), (["s1"], 60.0))
+        (self.dir / "preferencias_simples.json").unlink()
+        data, _ = storage.load(self.dir)
+        self.assertEqual([d.id for d in data["devices"]], ["m1", "m2"])
 
     def test_corrupt_file_falls_back_to_defaults(self):
-        (self.dir / SIMPLE.config_name).write_text("{oops", encoding="utf-8")
-        data, _ = storage.load(SIMPLE, self.dir)
+        (self.dir / storage.CONFIG_NAME).write_text("{oops", encoding="utf-8")
+        data, _ = storage.load(self.dir)
         self.assertEqual(data["brightness"], storage.DEFAULTS["brightness"])
 
 

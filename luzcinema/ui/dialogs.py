@@ -53,7 +53,8 @@ class LocalBulbDialog(Dialog):
         editing = device is not None
         prefill = prefill or {}
         source = device.to_dict() if device else {}
-        default_name = "Lâmpada" if not app.edition.multi else f"Lâmpada {len(app.controller.device_list()) + 1}"
+        others = [d for d in app.controller.device_list() if not device or d.id != device.id]
+        default_name = f"Lâmpada {len(others) + 1}" if others else "Lâmpada"
         self.original_id = device.id if device else None
         self.vars = {
             "name": tk.StringVar(value=source.get("name") or default_name),
@@ -88,7 +89,7 @@ class LocalBulbDialog(Dialog):
         ttk.Label(col, text="Versão do protocolo").pack(anchor="w")
         ttk.Combobox(col, textvariable=self.vars["version"], state="readonly", width=8,
                      values=[str(v) for v in reversed(SUPPORTED_VERSIONS)]).pack(anchor="w", pady=(4, 0))
-        if app.edition.multi:
+        if others:  # zona só faz sentido com duas ou mais lâmpadas
             col = ttk.Frame(row)
             col.pack(side="left", padx=(16, 0), fill="x", expand=True)
             ttk.Label(col, text="Zona da tela").pack(anchor="w")
@@ -137,13 +138,13 @@ class LocalBulbDialog(Dialog):
 
 
 class ChooseDevicesDialog(Dialog):
-    """Lista lâmpadas encontradas para o usuário escolher (uma na Simples, várias na Multi)."""
+    """Lista lâmpadas encontradas para o usuário escolher (várias, ou uma só com ``single``)."""
 
     def __init__(self, app, title: str, subtitle: str, devices: list[dict], on_choose, describe, single=False):
         super().__init__(app, title)
         self.on_choose = on_choose
         self.devices = devices
-        self.multi = multi = app.edition.multi and not single
+        self.multi = multi = not single
         known = set(app.controller.devices)
 
         ttk.Label(self.body, text=title, style="H1.TLabel").pack(anchor="w")

@@ -48,7 +48,7 @@ class SettingsPage(ScrollPage):
 
         about = card(body)
         about.outer.pack(fill="x", pady=(16, 0))
-        section_header(about, f"{app.edition.title}  ·  versão {__version__}", app.edition.subtitle,
+        section_header(about, f"Luz Cinema  ·  versão {__version__}", "Suas lâmpadas acompanhando a tela",
                        style_prefix="Card").pack(anchor="w", fill="x")
         ttk.Label(about, text=HOW_IT_WORKS, style="CardMuted.TLabel", wraplength=620, justify="left").pack(anchor="w", pady=(12, 0))
         links = ttk.Frame(about, style="Card.TFrame")

@@ -1,4 +1,8 @@
-"""Janela principal do Luz Cinema (compartilhada pelas edições Simples e Multi)."""
+"""Janela principal do Luz Cinema.
+
+Com uma lâmpada a interface fica enxuta; zonas, alvo do controle manual e chips por
+lâmpada só aparecem quando há duas ou mais configuradas.
+"""
 from __future__ import annotations
 
 import colorsys
@@ -15,7 +19,6 @@ from .. import __version__
 from .. import storage
 from ..core import (BulbError, Settings, cct_to_rgb, compute_zones_colors, downscale_frame, rgb_to_hex)
 from ..devices import BulbController, BulbDevice, friendly_error
-from ..edition import Edition
 from ..presets import preset_color_hex
 from ..scenarios import DEFAULT_SCENARIOS, Scenario
 from ..windows import (is_autostart_enabled, set_autostart, take_over_legacy_autostart, wake_requested)
@@ -32,9 +35,8 @@ ALL_ZONES = {"all", "left", "right", "top", "bottom", "center"}
 
 
 class App:
-    def __init__(self, root: tk.Tk, edition: Edition, data_dir=None):
+    def __init__(self, root: tk.Tk, data_dir=None):
         self.root = root
-        self.edition = edition
         self.data_dir = data_dir
         self.events: queue.Queue = queue.Queue()
         self.alive = True
@@ -52,7 +54,7 @@ class App:
         self.lamp_colors: dict[str, tuple[int, int, int]] = {}
         self.monitors: list[dict] = []
 
-        config, migrated = storage.load(edition, data_dir)
+        config, migrated = storage.load(data_dir)
         self.theme = Theme(root, config["theme_mode"])
         self.controller = BulbController(config["devices"], on_event=lambda k, p: self.events.put(("bulb", (k, p))))
         self.custom_presets: list[dict] = config["custom_presets"]
@@ -87,8 +89,8 @@ class App:
         # Sistema
         self.minimize_to_tray = tk.BooleanVar(value=config["minimize_to_tray"])
         if migrated:
-            take_over_legacy_autostart(edition)
-        self.start_with_windows = tk.BooleanVar(value=is_autostart_enabled(edition))
+            take_over_legacy_autostart()
+        self.start_with_windows = tk.BooleanVar(value=is_autostart_enabled())
         self.status_text = tk.StringVar()
         self.cinema_state = tk.StringVar()
 
@@ -108,8 +110,7 @@ class App:
             self.schedule_save()
             self.set_status("Preferências da versão anterior importadas. Sua chave local agora fica protegida pelo Windows.", "ok")
         elif not self.controller.device_list():
-            self.set_status("Bem-vindo! Comece conectando sua lâmpada." if not edition.multi
-                            else "Bem-vindo! Comece adicionando suas lâmpadas.")
+            self.set_status("Bem-vindo! Comece conectando sua lâmpada.")
             self.show_page("lamps")
         else:
             self.set_status("Pronto. Escolha uma cor, um cenário ou inicie o modo cinema.")
@@ -120,7 +121,7 @@ class App:
     # ================================================================== janela e layout
     def _setup_window(self):
         root = self.root
-        root.title(self.edition.title)
+        root.title("Luz Cinema")
         scale = max(1.0, root.winfo_fpixels("1i") / 96.0)
         w, h = round(1000 * scale), round(720 * scale)
         sw, sh = root.winfo_screenwidth(), root.winfo_screenheight()
@@ -159,10 +160,7 @@ class App:
         tk_logo = tk.Label(brand, image=self.logo, borderwidth=0)
         tk_logo.pack(side="left", padx=(2, 10))
         self.theme.bind(lambda t: tk_logo.configure(bg=t["SURFACE"]))
-        names = ttk.Frame(brand, style="Sidebar.TFrame")
-        names.pack(side="left")
-        ttk.Label(names, text="Luz Cinema", style="Brand.TLabel").pack(anchor="w")
-        ttk.Label(names, text=" MULTI " if self.edition.multi else " SIMPLES ", style="Badge.TLabel").pack(anchor="w", pady=(2, 0))
+        ttk.Label(brand, text="Luz Cinema", style="Brand.TLabel").pack(side="left")
 
         self.nav_buttons: dict[str, ttk.Button] = {}
         self.pages = {}
@@ -175,8 +173,7 @@ class App:
         self.content.pack(side="left", fill="both", expand=True)
 
         for key, label, page_cls in PAGES:
-            text = label if key != "lamps" or self.edition.multi else "💡  Lâmpada"
-            button = ttk.Button(self.sidebar, text=text, style="Nav.TButton", command=lambda k=key: self.show_page(k))
+            button = ttk.Button(self.sidebar, text=label, style="Nav.TButton", command=lambda k=key: self.show_page(k))
             button.pack(fill="x", pady=2)
             self.nav_buttons[key] = button
             self.pages[key] = page_cls(self, self.content)
@@ -331,7 +328,7 @@ class App:
             from mss import MSS
 
             dark_map: dict[str, bool] = {}
-            zones = ALL_ZONES if self.edition.multi else {"all"}
+            zones = ALL_ZONES if self.multi else {"all"}
             previous = last_ui = time.monotonic()
             with MSS() as capture:
                 while not self.stop_event.is_set():
@@ -391,7 +388,7 @@ class App:
     def target_ids(self) -> list[str] | None:
         """Lâmpadas que recebem o controle manual (None = todas)."""
         target = self.manual_target.get()
-        if self.edition.multi and target and target in self.controller.devices:
+        if self.multi and target and target in self.controller.devices:
             return [target]
         return None
 
@@ -495,12 +492,14 @@ class App:
         self.set_power(False)
 
     # ================================================================== lâmpadas
+    @property
+    def multi(self) -> bool:
+        """True quando há mais de uma lâmpada: libera zonas e controle por lâmpada."""
+        return len(self.controller.device_list()) > 1
+
     def save_device(self, device: BulbDevice):
-        if not self.edition.multi:
+        if not self.controller.device_list():
             device.zone, device.enabled = "all", True
-            for other in self.controller.device_list():
-                if other.id != device.id:
-                    self.controller.remove_device(other.id)
         self.controller.add_device(device)
         self.devices_changed()
         self.set_status(f"Lâmpada “{device.name}” salva. Testando conexão…")
@@ -512,6 +511,10 @@ class App:
 
         def run():
             self.controller.remove_device(device.id)
+            remaining = self.controller.device_list()
+            if len(remaining) == 1:
+                # Sozinha, a lâmpada volta a acompanhar a tela inteira (as zonas ficam ocultas).
+                remaining[0].zone, remaining[0].enabled = "all", True
             self.devices_changed()
             self.set_status(f"“{device.name}” removida.")
         self.after_cinema(run)
@@ -564,12 +567,12 @@ class App:
 
     # ================================================================== sistema
     def set_autostart(self, enabled: bool):
-        if set_autostart(self.edition, enabled):
+        if set_autostart(enabled):
             self.set_status("Vai iniciar junto com o Windows (na bandeja)." if enabled
                             else "Não vai mais iniciar com o Windows.", "ok")
         else:
             self.set_status("Não foi possível alterar o início automático.", "error")
-        self.start_with_windows.set(is_autostart_enabled(self.edition))
+        self.start_with_windows.set(is_autostart_enabled())
 
     def collect_config(self) -> dict:
         data = {k: var.get() for k, var in self.vars.items()}
@@ -592,7 +595,7 @@ class App:
     def save_now(self):
         self._save_job = None
         try:
-            storage.save(self.edition, self.collect_config(), self.data_dir)
+            storage.save(self.collect_config(), self.data_dir)
         except Exception as exc:
             log.exception("Falha ao salvar preferências")
             self.set_status(f"Não foi possível salvar as preferências: {exc}", "error")
@@ -731,8 +734,8 @@ class App:
             pass
 
 
-def run(edition: Edition):
-    """Ponto de entrada das duas edições."""
+def run():
+    """Ponto de entrada do app."""
     import os
     import sys
 
@@ -745,14 +748,14 @@ def run(edition: Edition):
         from .icons import ASSETS_DIR
         export_ico(ASSETS_DIR / "luzcinema.ico")
         return
-    if not check_single_instance(edition):
+    if not check_single_instance():
         return
-    setup_process(edition)
+    setup_process()
     root = tk.Tk()
     minimized = "--tray" in sys.argv or "--minimized" in sys.argv
     if minimized:
         root.withdraw()
-    app = App(root, edition)
+    app = App(root)
     if minimized and not app.tray.available:
         root.deiconify()
     root.mainloop()

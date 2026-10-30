@@ -1,6 +1,6 @@
 """Leitura e gravação das preferências, com migração das versões anteriores.
 
-Cada edição tem seu próprio arquivo em ``dados/``. As chaves locais das lâmpadas
+Tudo fica em ``dados/preferencias_v3.json``. As chaves locais das lâmpadas
 são gravadas protegidas pela DPAPI do Windows (campo ``protected_key``), nunca em texto puro.
 """
 from __future__ import annotations
@@ -10,12 +10,14 @@ import logging
 from pathlib import Path
 
 from .devices import BulbDevice
-from .edition import Edition
 from .windows import DATA_DIR, protect
 
 log = logging.getLogger(__name__)
 
 SCHEMA = 3
+CONFIG_NAME = "preferencias_v3.json"
+# Arquivos das edições Simples/Multi (3.0), em ordem de preferência na migração.
+LEGACY_EDITIONS = ("preferencias_simples.json", "preferencias_multi.json")
 LEGACY_V2 = "preferencias_v2.json"
 LEGACY_V1 = "preferencias.json"
 
@@ -42,8 +44,8 @@ DEFAULTS = {
 }
 
 
-def config_path(edition: Edition, data_dir: Path | None = None) -> Path:
-    return (data_dir or DATA_DIR) / edition.config_name
+def config_path(data_dir: Path | None = None) -> Path:
+    return (data_dir or DATA_DIR) / CONFIG_NAME
 
 
 def _encode_device(device: BulbDevice) -> dict:
@@ -80,16 +82,18 @@ def _read_json(path: Path) -> dict | None:
         return None
 
 
-def _normalize(data: dict, edition: Edition) -> dict:
+def _normalize(data: dict) -> dict:
     result = dict(DEFAULTS)
     result.update({k: v for k, v in data.items() if k in DEFAULTS})
-    devices = [d for d in (_decode_device(x) for x in data.get("devices", [])) if d]
-    if not edition.multi:
-        # Edição simples: uma lâmpada, sempre acompanhando a tela inteira.
-        devices = sorted(devices, key=lambda d: not d.enabled)[:1]
-        for d in devices:
-            d.zone, d.enabled = "all", True
-    result["devices"] = devices
+    devices: dict[str, BulbDevice] = {}
+    for device in (_decode_device(x) for x in data.get("devices", [])):
+        if device and device.id not in devices:
+            devices[device.id] = device
+    result["devices"] = list(devices.values())
+    if len(devices) == 1:
+        # Sozinha, a lâmpada acompanha a tela inteira (zonas só aparecem com duas ou mais).
+        only = result["devices"][0]
+        only.zone, only.enabled = "all", True
     for key in ("custom_presets", "custom_scenarios"):
         if not isinstance(result[key], list):
             result[key] = []
@@ -125,29 +129,34 @@ def _device_from_tuya_session() -> list[dict]:
     return [{"id": device_id, "name": bulb.get("name") or "Lâmpada Tuya", "connection_type": "cloud"}]
 
 
-def load(edition: Edition, data_dir: Path | None = None) -> tuple[dict, bool]:
+def _read_legacy(base: Path) -> dict | None:
+    for name in (*LEGACY_EDITIONS, LEGACY_V2):
+        data = _read_json(base / name)
+        if data is not None:
+            return data
+    v1 = _read_json(base / LEGACY_V1)
+    return _from_legacy_v1(v1) if v1 else None
+
+
+def load(data_dir: Path | None = None) -> tuple[dict, bool]:
     """Carrega as preferências. Retorna (dados, migrado_de_versao_antiga)."""
     base = data_dir or DATA_DIR
-    data = _read_json(config_path(edition, base))
+    data = _read_json(config_path(base))
     migrated = False
     if data is None:
-        legacy = _read_json(base / LEGACY_V2)
-        if legacy is None:
-            v1 = _read_json(base / LEGACY_V1)
-            legacy = _from_legacy_v1(v1) if v1 else None
+        legacy = _read_legacy(base)
         data = legacy or {}
         migrated = legacy is not None
         if not data.get("devices"):
             data["devices"] = _device_from_tuya_session()
-    return _normalize(data, edition), migrated
+    return _normalize(data), migrated
 
 
-def save(edition: Edition, data: dict, data_dir: Path | None = None):
+def save(data: dict, data_dir: Path | None = None):
     """Grava as preferências de forma atômica (arquivo temporário + troca)."""
-    path = config_path(edition, data_dir)
+    path = config_path(data_dir)
     payload = {k: data.get(k, DEFAULTS[k]) for k in DEFAULTS}
     payload["schema"] = SCHEMA
-    payload["edition"] = edition.key
     payload["devices"] = [_encode_device(d) for d in data.get("devices", [])]
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")

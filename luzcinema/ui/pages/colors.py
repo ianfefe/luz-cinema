@@ -31,15 +31,17 @@ class ColorsPage(ScrollPage):
         # ---------------------------------------------------------- cor manual
         left = card(columns)
         left.outer.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-        if app.edition.multi:
-            ttk.Label(left, text="Aplicar em", style="CardMuted.TLabel").pack(anchor="w")
-            self.target_combo = ttk.Combobox(left, state="readonly")
-            self.target_combo.pack(fill="x", pady=(4, 14))
-            self.target_combo.bind("<<ComboboxSelected>>", lambda _: self._on_target())
-            self.on_devices_changed()
+        # Alvo do controle manual: só aparece com duas ou mais lâmpadas.
+        self.target_box = ttk.Frame(left, style="Card.TFrame")
+        ttk.Label(self.target_box, text="Aplicar em", style="CardMuted.TLabel").pack(anchor="w")
+        self.target_combo = ttk.Combobox(self.target_box, state="readonly")
+        self.target_combo.pack(fill="x", pady=(4, 14))
+        self.target_combo.bind("<<ComboboxSelected>>", lambda _: self._on_target())
 
         modes = ttk.Frame(left, style="Card.TFrame")
         modes.pack(fill="x")
+        self.modes_row = modes
+        self.on_devices_changed()
         self.mode_buttons = {
             "colour": ttk.Button(modes, text="🎨  Colorida", command=lambda: self._set_mode("colour")),
             "white": ttk.Button(modes, text="☀  Branca", command=lambda: self._set_mode("white")),
@@ -163,7 +165,7 @@ class ColorsPage(ScrollPage):
         self.custom_grid.columnconfigure(0, weight=1, uniform="p")
         self.custom_grid.columnconfigure(1, weight=1, uniform="p")
 
-    # ------------------------------------------------------------------ lâmpada alvo (Multi)
+    # ------------------------------------------------------------------ lâmpada alvo (2+ lâmpadas)
     def _target_options(self):
         return [(None, ALL_LAMPS)] + [(d.id, d.name) for d in self.app.controller.device_list()]
 
@@ -174,8 +176,10 @@ class ColorsPage(ScrollPage):
         self.app.schedule_save()
 
     def on_devices_changed(self):
-        if not self.app.edition.multi:
+        if not self.app.multi:
+            self.target_box.pack_forget()
             return
+        self.target_box.pack(fill="x", before=self.modes_row)
         options = self._target_options()
         self.target_combo.configure(values=[label for _, label in options])
         ids = [bid for bid, _ in options]

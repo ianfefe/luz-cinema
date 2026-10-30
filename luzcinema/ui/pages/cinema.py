@@ -28,18 +28,16 @@ class CinemaPage(ScrollPage):
     def __init__(self, app, parent):
         super().__init__(parent, app.theme)
         self.app = app
-        multi = app.edition.multi
         body = self.body
 
         ttk.Label(body, text="Modo cinema", style="H1.TLabel").pack(anchor="w")
-        ttk.Label(body, style="Muted.TLabel", text=(
-            "Cada lâmpada acompanha a sua zona da tela em tempo real." if multi
-            else "Sua lâmpada acompanha as cores da tela em tempo real.")).pack(anchor="w", pady=(2, 18))
+        self.subtitle = ttk.Label(body, style="Muted.TLabel")
+        self.subtitle.pack(anchor="w", pady=(2, 18))
 
         # Prévia + controles principais
         hero = card(body, padding=0)
         hero.outer.pack(fill="x")
-        self.preview = ScreenPreview(hero, app.theme, show_zones=multi)
+        self.preview = ScreenPreview(hero, app.theme, show_zones=False)
         self.preview.pack(fill="x")
         controls = ttk.Frame(hero, style="Card.TFrame", padding=(18, 4, 18, 18))
         controls.pack(fill="x")
@@ -56,12 +54,10 @@ class CinemaPage(ScrollPage):
             self.monitor_combo.current(app.monitor_index)
         self.monitor_combo.bind("<<ComboboxSelected>>", lambda _: app.set_monitor(self.monitor_combo.current()))
 
-        self.lamps_row = None
-        if multi:
-            self.lamps_row = ttk.Frame(hero, style="Card.TFrame", padding=(18, 0, 18, 16))
-            self.lamps_row.pack(fill="x")
-            self.lamp_swatches: dict[str, Swatch] = {}
-            self.on_devices_changed()
+        # Chips por lâmpada: só aparecem com duas ou mais.
+        self.lamps_row = ttk.Frame(hero, style="Card.TFrame", padding=(18, 0, 18, 16))
+        self.lamp_swatches: dict[str, Swatch] = {}
+        self.on_devices_changed()
 
         # Perfis prontos
         profiles = card(body)
@@ -147,17 +143,23 @@ class CinemaPage(ScrollPage):
 
     def on_frame(self, colors, lamp_colors):
         self.preview.set_colors(colors or None)
-        if self.lamps_row is not None:
+        if self.lamp_swatches:
             for bid, swatch in self.lamp_swatches.items():
                 rgb = lamp_colors.get(bid)
                 swatch.set("#%02x%02x%02x" % rgb if rgb else self.app.theme["CARD_HOVER"])
 
     def on_devices_changed(self):
-        if self.lamps_row is None:
-            return
+        multi = self.app.multi
+        self.subtitle.configure(text="Cada lâmpada acompanha a sua zona da tela em tempo real." if multi
+                                else "Sua lâmpada acompanha as cores da tela em tempo real.")
+        self.preview.set_show_zones(multi)
         for child in self.lamps_row.winfo_children():
             child.destroy()
         self.lamp_swatches = {}
+        if not multi:
+            self.lamps_row.pack_forget()
+            return
+        self.lamps_row.pack(fill="x")
         devices = self.app.controller.active_devices()
         if not devices:
             ttk.Label(self.lamps_row, text="Nenhuma lâmpada ativa no cinema. Configure na página Lâmpadas.",

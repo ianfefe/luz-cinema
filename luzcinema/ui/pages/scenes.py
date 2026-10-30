@@ -15,7 +15,7 @@ class ScenesPage(ScrollPage):
         ttk.Label(body, text="Cenários", style="H1.TLabel").pack(anchor="w")
         ttk.Label(body, style="Muted.TLabel", wraplength=640, justify="left", text=(
             "Ambientes prontos com um clique. Com várias lâmpadas, cada zona recebe sua própria cor."
-            if app.edition.multi else "Ambientes prontos com um clique.")).pack(anchor="w", pady=(2, 18))
+            )).pack(anchor="w", pady=(2, 18))
 
         self.grid = ttk.Frame(body)
         self.grid.pack(fill="x")

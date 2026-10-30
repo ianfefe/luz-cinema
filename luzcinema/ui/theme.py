@@ -126,7 +126,6 @@ class Theme:
             "CardValue.TLabel": (t["CARD"], t["ACCENT"], (FONT_SEMIBOLD, 10)),
             "Brand.TLabel": (t["SURFACE"], t["FG"], (FONT_SEMIBOLD, 14)),
             "SidebarMuted.TLabel": (t["SURFACE"], t["MUTED"], (FONT, 9)),
-            "Badge.TLabel": (t["ACCENT_SOFT"], t["ACCENT"], (FONT_SEMIBOLD, 8)),
             "Status.TLabel": (t["SURFACE"], t["MUTED"], (FONT, 9)),
             "StatusError.TLabel": (t["SURFACE"], t["DANGER"], (FONT, 9)),
             "StatusOk.TLabel": (t["SURFACE"], t["SUCCESS"], (FONT, 9)),

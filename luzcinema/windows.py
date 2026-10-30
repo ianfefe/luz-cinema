@@ -8,8 +8,6 @@ import os
 from pathlib import Path
 import sys
 
-from .edition import Edition
-
 if os.name == "nt":
     import winreg
 else:  # pragma: no cover - o app é exclusivo para Windows; mantém import possível em testes
@@ -18,6 +16,14 @@ else:  # pragma: no cover - o app é exclusivo para Windows; mantém import poss
 APP_DIR = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent
 DATA_DIR = APP_DIR / "dados"
 
+APP_REG_NAME = "LuzCinema"
+WAKE_EVENT_NAME = "LuzCinema_WakeEvent"
+APP_USER_MODEL_ID = "LuzCinema.App"
+ENTRY_SCRIPT = "luz_cinema.py"
+EXE_NAME = "LuzCinema.exe"
+# Nomes usados pelas versões anteriores (v2 e edição Multi) no início automático.
+LEGACY_REG_NAMES = ("LuzCinemaV2", "LuzCinemaMulti")
+
 REG_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 REG_APPROVED_KEY = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
 ERROR_ALREADY_EXISTS = 183
@@ -25,8 +31,8 @@ ERROR_ALREADY_EXISTS = 183
 _wake_event = None
 
 
-def check_single_instance(edition: Edition) -> bool:
-    """Garante uma instância por edição. Uma segunda abertura acorda a janela existente."""
+def check_single_instance() -> bool:
+    """Garante uma única instância. Uma segunda abertura acorda a janela existente."""
     global _wake_event
     if os.name != "nt":
         return True
@@ -38,7 +44,7 @@ def check_single_instance(edition: Edition) -> bool:
         kernel32.WaitForSingleObject.restype = wintypes.DWORD
         kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
 
-        _wake_event = kernel32.CreateEventW(None, False, False, edition.wake_event)
+        _wake_event = kernel32.CreateEventW(None, False, False, WAKE_EVENT_NAME)
         if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
             if "--tray" not in sys.argv and "--minimized" not in sys.argv:
                 kernel32.SetEvent(_wake_event)
@@ -58,27 +64,27 @@ def wake_requested() -> bool:
         return False
 
 
-def launch_command(edition: Edition) -> str:
+def launch_command() -> str:
     """Linha de comando usada pelo Windows para abrir o app minimizado na bandeja."""
     if getattr(sys, "frozen", False):
         return f'"{Path(sys.executable).resolve()}" --tray'
 
-    exe_candidate = APP_DIR / edition.exe_name
+    exe_candidate = APP_DIR / EXE_NAME
     if exe_candidate.exists():
         return f'"{exe_candidate.resolve()}" --tray'
 
     pythonw = Path(sys.executable).with_name("pythonw.exe")
     interpreter = pythonw if pythonw.exists() else Path(sys.executable)
-    return f'"{interpreter}" "{(APP_DIR / edition.script).resolve()}" --tray'
+    return f'"{interpreter}" "{(APP_DIR / ENTRY_SCRIPT).resolve()}" --tray'
 
 
-def is_autostart_enabled(edition: Edition) -> bool:
+def is_autostart_enabled() -> bool:
     """Verifica se o início automático está registrado, aponta para algo existente e não foi bloqueado."""
     if os.name != "nt":
         return False
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_RUN_KEY, 0, winreg.KEY_READ) as key:
-            value, _ = winreg.QueryValueEx(key, edition.reg_name)
+            value, _ = winreg.QueryValueEx(key, APP_REG_NAME)
     except OSError:
         return False
     if not isinstance(value, str) or not value.strip():
@@ -89,7 +95,7 @@ def is_autostart_enabled(edition: Edition) -> bool:
         return False
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_APPROVED_KEY, 0, winreg.KEY_READ) as key:
-            approved, _ = winreg.QueryValueEx(key, edition.reg_name)
+            approved, _ = winreg.QueryValueEx(key, APP_REG_NAME)
         # Bit 0 ligado = desativado pelo usuário no Gerenciador de Tarefas.
         if isinstance(approved, (bytes, bytearray)) and approved and approved[0] & 1:
             return False
@@ -98,25 +104,25 @@ def is_autostart_enabled(edition: Edition) -> bool:
     return True
 
 
-def set_autostart(edition: Edition, enable: bool) -> bool:
+def set_autostart(enable: bool) -> bool:
     """Ativa ou desativa o início com o Windows. Retorna True se o registro foi alterado com sucesso."""
     if os.name != "nt":
         return False
     try:
         with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, REG_RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
             if enable:
-                winreg.SetValueEx(key, edition.reg_name, 0, winreg.REG_SZ, launch_command(edition))
+                winreg.SetValueEx(key, APP_REG_NAME, 0, winreg.REG_SZ, launch_command())
             else:
                 try:
-                    winreg.DeleteValue(key, edition.reg_name)
+                    winreg.DeleteValue(key, APP_REG_NAME)
                 except FileNotFoundError:
                     pass
         with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, REG_APPROVED_KEY, 0, winreg.KEY_SET_VALUE) as key:
             if enable:
-                winreg.SetValueEx(key, edition.reg_name, 0, winreg.REG_BINARY, b"\x02" + b"\x00" * 11)
+                winreg.SetValueEx(key, APP_REG_NAME, 0, winreg.REG_BINARY, b"\x02" + b"\x00" * 11)
             else:
                 try:
-                    winreg.DeleteValue(key, edition.reg_name)
+                    winreg.DeleteValue(key, APP_REG_NAME)
                 except FileNotFoundError:
                     pass
         return True
@@ -124,22 +130,25 @@ def set_autostart(edition: Edition, enable: bool) -> bool:
         return False
 
 
-def take_over_legacy_autostart(edition: Edition, legacy_name: str = "LuzCinemaV2") -> bool:
-    """Se a v2 antiga iniciava com o Windows, passa esse início para esta edição (evita abrir as duas)."""
+def take_over_legacy_autostart() -> bool:
+    """Se uma versão anterior iniciava com o Windows, passa esse início para o app atual (evita abrir duas)."""
     if os.name != "nt":
         return False
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_RUN_KEY, 0, winreg.KEY_READ) as key:
-            winreg.QueryValueEx(key, legacy_name)
-    except OSError:
-        return False
-    for path in (REG_RUN_KEY, REG_APPROVED_KEY):
+    found = False
+    for name in LEGACY_REG_NAMES:
         try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_SET_VALUE) as key:
-                winreg.DeleteValue(key, legacy_name)
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_RUN_KEY, 0, winreg.KEY_READ) as key:
+                value, _ = winreg.QueryValueEx(key, name)
         except OSError:
-            pass
-    return set_autostart(edition, True)
+            continue
+        found = found or (isinstance(value, str) and bool(value.strip()))
+        for path in (REG_RUN_KEY, REG_APPROVED_KEY):
+            try:
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER, path, 0, winreg.KEY_SET_VALUE) as key:
+                    winreg.DeleteValue(key, name)
+            except OSError:
+                pass
+    return set_autostart(True) if found else False
 
 
 def protect(text: str, decrypt: bool = False) -> str:
@@ -165,8 +174,8 @@ def protect(text: str, decrypt: bool = False) -> str:
         ctypes.windll.kernel32.LocalFree(outgoing.pbData)
 
 
-def setup_process(edition: Edition):
-    """Ativa DPI nítido e separa o ícone da barra de tarefas por edição."""
+def setup_process():
+    """Ativa DPI nítido e define a identidade do app na barra de tarefas."""
     if os.name != "nt":
         return
     try:
@@ -174,7 +183,7 @@ def setup_process(edition: Edition):
     except (AttributeError, OSError):
         pass
     try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(edition.app_id)
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
     except (AttributeError, OSError):
         pass
 

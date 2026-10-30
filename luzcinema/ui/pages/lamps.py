@@ -1,4 +1,4 @@
-"""Página Lâmpada (Simples) / Lâmpadas (Multi): ver, testar, adicionar e organizar as lâmpadas."""
+"""Página Lâmpadas: ver, testar, adicionar e organizar as lâmpadas."""
 from __future__ import annotations
 
 from tkinter import ttk
@@ -16,16 +16,13 @@ class LampsPage(ScrollPage):
     def __init__(self, app, parent):
         super().__init__(parent, app.theme)
         self.app = app
-        self.multi = app.edition.multi
         self.swatches: dict[str, Swatch] = {}
         self.status_labels: dict[str, ttk.Label] = {}
         body = self.body
 
-        ttk.Label(body, text="Lâmpadas" if self.multi else "Lâmpada", style="H1.TLabel").pack(anchor="w")
+        ttk.Label(body, text="Lâmpadas", style="H1.TLabel").pack(anchor="w")
         ttk.Label(body, style="Muted.TLabel", wraplength=640, justify="left", text=(
-            "Adicione quantas lâmpadas quiser e escolha qual parte da tela cada uma acompanha."
-            if self.multi else
-            "A edição Simples controla uma lâmpada por vez. Para usar várias, abra o Luz Cinema Multi."
+            "Conecte sua lâmpada. Com duas ou mais, você escolhe qual parte da tela cada uma acompanha."
         )).pack(anchor="w", pady=(2, 18))
 
         self.devices_area = ttk.Frame(body)
@@ -62,10 +59,7 @@ class LampsPage(ScrollPage):
         self.swatches.clear()
         self.status_labels.clear()
         devices = self.app.controller.device_list()
-        if self.multi:
-            self.add_title.configure(text="Adicionar lâmpada")
-        else:
-            self.add_title.configure(text="Trocar de lâmpada" if devices else "Conectar sua lâmpada")
+        self.add_title.configure(text="Adicionar outra lâmpada" if devices else "Conectar sua lâmpada")
         if not devices:
             empty = card(self.devices_area, padding=24)
             empty.outer.pack(fill="x")
@@ -77,11 +71,12 @@ class LampsPage(ScrollPage):
 
     def _device_card(self, device: BulbDevice):
         app = self.app
+        multi = app.multi
         box = card(self.devices_area)
         box.outer.pack(fill="x", pady=(0, 10))
         top = ttk.Frame(box, style="Card.TFrame")
         top.pack(fill="x")
-        swatch = Swatch(top, app.theme, self._power_color(device), size=34 if not self.multi else 26)
+        swatch = Swatch(top, app.theme, self._power_color(device), size=26 if multi else 34)
         swatch.pack(side="left", padx=(0, 14))
         self.swatches[device.id] = swatch
         info = ttk.Frame(top, style="Card.TFrame")
@@ -90,7 +85,7 @@ class LampsPage(ScrollPage):
         details = device.kind_label + (f"  ·  {device.ip}" if device.is_local and device.ip else "")
         ttk.Label(info, text=details, style="CardMuted.TLabel").pack(anchor="w")
 
-        if self.multi:
+        if multi:
             zone_box = ttk.Frame(top, style="Card.TFrame")
             zone_box.pack(side="right")
             ttk.Label(zone_box, text="Acompanha", style="CardMuted.TLabel").pack(anchor="w")
@@ -171,15 +166,15 @@ class LampsPage(ScrollPage):
         self.app.set_status(f"{len(devices)} lâmpada(s) encontrada(s) na conta.")
         ChooseDevicesDialog(
             self.app, "Lâmpadas da sua conta",
-            "Escolha as lâmpadas que o Luz Cinema deve controlar." if self.multi
-            else "Escolha a lâmpada que o Luz Cinema deve controlar.",
+            "Escolha as lâmpadas que o Luz Cinema deve controlar.",
             devices, self._add_cloud_devices,
             describe=lambda d: d["name"] + ("" if d.get("online", True) else "  (offline)"))
 
     def _add_cloud_devices(self, chosen):
-        count = len(self.app.controller.device_list()) if self.multi else 0
+        count = len(self.app.controller.device_list())
+        several = count + len(chosen) > 1
         for i, item in enumerate(chosen):
-            zone = SUGGESTED_ZONES[min(count + i, len(SUGGESTED_ZONES) - 1)] if self.multi else "all"
+            zone = SUGGESTED_ZONES[min(count + i, len(SUGGESTED_ZONES) - 1)] if several else "all"
             self.app.save_device(BulbDevice(id=item["id"], name=item["name"], connection_type="cloud", zone=zone))
 
     def scan(self):

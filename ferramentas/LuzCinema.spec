@@ -1,7 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Gera as duas edições oficiais (rode a partir da raiz do repositório):
-#   dist/LuzCinema.exe       -> edição Simples (uma lâmpada)
-#   dist/LuzCinemaMulti.exe  -> edição Multi (várias lâmpadas por zona)
+# Gera dist/LuzCinema.exe (rode a partir da raiz do repositório).
 import os
 
 from PyInstaller.utils.hooks import collect_all
@@ -20,13 +18,7 @@ for package in ('mss', 'tinytuya', 'tuya_sharing', 'pystray'):
 
 EXCLUDES = ['numpy', 'pandas', 'scipy', 'matplotlib', 'IPython', 'pytest']
 
-
-def build(script, name):
-    analysis = Analysis([os.path.join(ROOT, script)], pathex=[ROOT], binaries=binaries, datas=datas,
-                        hiddenimports=hiddenimports, excludes=EXCLUDES, noarchive=False, optimize=0)
-    return EXE(PYZ(analysis.pure), analysis.scripts, analysis.binaries, analysis.datas, [],
-               name=name, debug=False, strip=False, upx=True, console=False, icon=ICON)
-
-
-build('luz_cinema.py', 'LuzCinema')
-build('luz_cinema_multi.py', 'LuzCinemaMulti')
+analysis = Analysis([os.path.join(ROOT, 'luz_cinema.py')], pathex=[ROOT], binaries=binaries, datas=datas,
+                    hiddenimports=hiddenimports, excludes=EXCLUDES, noarchive=False, optimize=0)
+exe = EXE(PYZ(analysis.pure), analysis.scripts, analysis.binaries, analysis.datas, [],
+          name='LuzCinema', debug=False, strip=False, upx=True, console=False, icon=ICON)
