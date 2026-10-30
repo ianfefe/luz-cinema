@@ -1,3 +1,4 @@
+"""Gera o luzcinema.ico (lâmpada com óculos 3D) usado pelos executáveis."""
 from PIL import Image, ImageDraw, ImageFilter
 from pathlib import Path
 
@@ -83,7 +84,4 @@ def generate_ico(output_path: Path):
     print(f"Generated ICO at: {output_path}")
 
 if __name__ == "__main__":
-    work_dir = Path(__file__).resolve().parent
-    generate_ico(work_dir / "luzcinema.ico")
-    generate_ico(work_dir.parent / "outputs" / "LuzCinema" / "luzcinema.ico")
-    generate_ico(work_dir.parent / "luzcinema.ico")
+    generate_ico(Path(__file__).resolve().parents[1] / "luzcinema" / "assets" / "luzcinema.ico")

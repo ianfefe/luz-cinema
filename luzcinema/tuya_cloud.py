@@ -1,31 +1,39 @@
-"""Account-authorized control of the one selected bulb via Tuya sharing SDK."""
+"""Controle de lâmpadas pela conta Tuya (SDK de compartilhamento de dispositivos)."""
 from __future__ import annotations
 
 import colorsys
+from copy import deepcopy
 from functools import partial
 import json
 import logging
 import threading
 import time
-from copy import deepcopy
 
-from core import BulbError, is_white_cct_candidate, calc_cct_values
+from .core import BulbError, is_white_cct_candidate, calc_cct_values
 
 SESSION_LOCK = threading.Lock()
 
+# Categorias Tuya de iluminação (lâmpadas, fitas, luminárias de teto, etc.).
+LIGHT_CATEGORIES = {"dj", "dd", "xdd", "fwd", "dc", "tgq", "tgkg", "gyd", "sxd", "fsd", "tyndj", "ykq"}
+
 
 def load_session():
-    from vincular_tuya import SESSION_FILE
-    from luz_cinema import protect
+    from .tuya_link import SESSION_FILE
+    from .windows import protect
     try:
         with SESSION_LOCK:
-            return json.loads(protect(SESSION_FILE.read_text(encoding='ascii'),decrypt=True))
+            return json.loads(protect(SESSION_FILE.read_text(encoding="ascii"), decrypt=True))
     except Exception:
-        raise BulbError('Vincule sua conta primeiro na aba Conta Tuya.') from None
+        raise BulbError("Vincule sua conta Tuya primeiro (QR code).") from None
+
+
+def has_session() -> bool:
+    from .tuya_link import SESSION_FILE
+    return SESSION_FILE.exists()
 
 
 def update_session(data):
-    from vincular_tuya import save_session
+    from .tuya_link import save_session
     with SESSION_LOCK:
         save_session(data)
 
@@ -41,7 +49,7 @@ class TokenListener:
 
 def make_manager(session):
     from tuya_sharing import Manager
-    from vincular_tuya import CLIENT_ID, check_endpoint
+    from .tuya_link import CLIENT_ID, check_endpoint
     logging.getLogger('tuya_sharing').setLevel(logging.CRITICAL)
     if session.get('client_id')!=CLIENT_ID:
         raise BulbError('Registro da autorização não reconhecido. Vincule a conta novamente.')
@@ -53,33 +61,44 @@ def make_manager(session):
 
 
 def query_account_devices(session=None) -> list[dict]:
-    """Retorna os dispositivos da conta Tuya para seleção de múltiplas lâmpadas."""
+    """Lista as lâmpadas da conta Tuya vinculada. Lança BulbError se a consulta falhar."""
+    sess = deepcopy(session) if session else load_session()
     try:
-        sess = deepcopy(session) if session else load_session()
-        mgr = make_manager(sess)
-        devices = mgr.device_repository.devices.values()
-        results = []
-        for d in devices:
-            results.append({
-                "id": d.id,
-                "name": getattr(d, "name", "Lâmpada Tuya") or "Lâmpada Tuya",
-                "online": bool(getattr(d, "online", True)),
-                "category": str(getattr(d, "category", "light")),
-            })
-        return results
+        manager = make_manager(sess)
+        try:
+            manager.update_device_cache()
+            devices = list(manager.device_map.values())
+        finally:
+            manager.customer_api.session.close()
+    except BulbError:
+        raise
     except Exception:
-        return []
+        raise BulbError("Falha ao consultar a conta Tuya. Verifique a internet ou vincule a conta novamente.") from None
+    results = []
+    for d in devices:
+        category = str(getattr(d, "category", "") or "")
+        if category and category not in LIGHT_CATEGORIES:
+            continue
+        results.append({
+            "id": d.id,
+            "name": getattr(d, "name", None) or "Lâmpada Tuya",
+            "online": bool(getattr(d, "online", True)),
+            "category": category,
+        })
+    return results
 
 
 class CloudBulb:
+    """Uma lâmpada controlada pela API da Tuya (internet), com limite de taxa de envio."""
     min_interval = 0.25
 
     def __init__(self, session=None, manager=None, device_id=None):
         self.session = deepcopy(session) if session else load_session()
         self.device_id = device_id or self.session.get('device_id')
         if not self.device_id:
-            raise BulbError('Informe o ID virtual da sua lâmpada ao vincular a conta.')
+            raise BulbError('Escolha qual lâmpada da conta Tuya deve ser usada.')
         self.manager = manager or make_manager(self.session)
+        self._lock=threading.Lock()
         self.changed=False
         self.last_rgb=None
         self.last_ack_ms=None
@@ -140,6 +159,16 @@ class CloudBulb:
         commands.extend([{'code':'work_mode','value':status['work_mode']}, {'code':switch,'value':status[switch]}])
         return commands
 
+    def capture_state(self):
+        """Relê o estado atual na nuvem para restaurá-lo ao fim do cinema."""
+        device=self.read_device()
+        status=device.status
+        self.original=self.restore_commands(status,self.functions,self.switch,self.colour) or self.original
+        self.off=not status.get(self.switch,False)
+        self.color_mode=status.get('work_mode')=='colour'
+        self.white_mode=status.get('work_mode')=='white'
+        self.changed=False
+
     def read_device(self):
         try:
             devices=self.manager.device_repository.query_devices_by_ids([self.device_id])
@@ -153,6 +182,10 @@ class CloudBulb:
             raise BulbError('Falha ao consultar a Tuya. Verifique a internet ou vincule a conta novamente.') from None
 
     def send(self, commands):
+        with self._lock:
+            self._send_unlocked(commands)
+
+    def _send_unlocked(self, commands):
         try:
             # Bound request rate without accumulating stale frames or parallel requests.
             delay=self.min_interval-(time.monotonic()-self.last_request)

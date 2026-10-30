@@ -1,12 +1,12 @@
+"""Copia as licenças das dependências para a pasta licencas/ (rodar antes de publicar uma versão)."""
 from pathlib import Path
 import importlib.metadata as metadata
 import shutil
 import sys
 
-base = Path(__file__).resolve().parents[1]
-target = base/'outputs'/'LuzCinema'/'licencas'
+target = Path(__file__).resolve().parent/'licencas'
 target.mkdir(exist_ok=True)
-names = ['tinytuya','mss','Pillow','cryptography','cffi','pycparser','requests',
+names = ['tinytuya','mss','Pillow','pystray','cryptography','cffi','pycparser','requests',
          'urllib3','certifi','charset-normalizer','idna','colorama','PyInstaller','setuptools',
          'tuya-device-sharing-sdk','qrcode','paho-mqtt']
 versions=[]

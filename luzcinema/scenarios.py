@@ -1,9 +1,9 @@
-"""Sistema de Cenários de Iluminação para o Luz Cinema v2."""
+"""Cenários de iluminação prontos e personalizados."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from typing import Any
-from core import rgb_to_hex, hex_to_rgb
+from .core import rgb_to_hex
 
 
 @dataclass
@@ -40,6 +40,10 @@ class Scenario:
             zone_colors=data.get("zone_colors", {}),
             is_custom=bool(data.get("is_custom", False)),
         )
+
+    @property
+    def preview_hex(self) -> str:
+        return rgb_to_hex(tuple(self.default_rgb))
 
     def get_color_for_bulb(self, bulb_id: str, zone: str = "all") -> dict[str, Any]:
         """Retorna o comando de luz (modo, rgb, brilho, temp) para uma lâmpada específica."""

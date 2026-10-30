@@ -2,10 +2,10 @@ import unittest
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
-sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'outputs'/'LuzCinema'))
-from tuya_cloud import CloudBulb
-from core import BulbError
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from luzcinema.tuya_cloud import CloudBulb
+from luzcinema.core import BulbError
 
 class CloudTests(unittest.TestCase):
     def setup_bulb(self,mode='white',online=True):
@@ -87,8 +87,17 @@ class CloudTests(unittest.TestCase):
         self.assertEqual(cmd['work_mode'],'colour')
         self.assertIn('colour_data_v2',cmd)
 
+    def test_capture_state_refreshes_restore_point(self):
+        bulb=self.setup_bulb()
+        self.device_status={'switch_led':True,'work_mode':'colour','bright_value_v2':10,'temp_value_v2':0,'colour_data_v2':'{"h":0,"s":1000,"v":1000}'}
+        bulb.read_device=lambda:SimpleNamespace(status=self.device_status)
+        bulb.capture_state()
+        restored={c['code']:c['value'] for c in bulb.original}
+        self.assertTrue(restored['switch_led']); self.assertEqual(restored['work_mode'],'colour')
+        self.assertFalse(bulb.changed)
+
     def test_authorization_endpoint_validation(self):
-        from vincular_tuya import check_endpoint
+        from luzcinema.tuya_link import check_endpoint
         for value in ('http://apigw.tuyaus.com','https://tuyaus.com.attacker.invalid','https://user:pass@tuyaus.com','https://tuyaus.com:4433'):
             with self.assertRaises(ValueError):check_endpoint(value)
         self.assertEqual(check_endpoint('https://apigw.tuyaus.com/'),'https://apigw.tuyaus.com')

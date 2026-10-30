@@ -1,137 +1,122 @@
-# 🎬 Luz Cinema v2
+# 🎬 Luz Cinema
 
 <p align="center">
-  <img src="luzcinema.ico" width="80" height="80" alt="Luz Cinema Logo"><br>
-  <b>Ambilight Espacial Multi-Lâmpadas & Sistema de Cenários para Windows</b><br>
-  <i>Transforme seu quarto em uma verdadeira sala de cinema com iluminação dinâmica sincronizada à tela em tempo real.</i>
+  <img src="luzcinema/assets/luzcinema.ico" width="80" height="80" alt="Luz Cinema"><br>
+  <b>Suas lâmpadas inteligentes acompanhando as cores da tela do PC, em tempo real.</b><br>
+  <i>Filmes, jogos e vídeos com iluminação ambiente — sem hardware extra.</i>
 </p>
 
 <p align="center">
-  <a href="https://github.com/ianfefe/luz-cinema/releases"><img src="https://img.shields.io/github/v/release/ianfefe/luz-cinema?color=8b7bff&label=Vers%C3%A3o" alt="GitHub Release"></a>
-  <img src="https://img.shields.io/badge/Plataforma-Windows%2010%20%7C%2011-blue" alt="Windows 10/11">
+  <a href="https://github.com/ianfefe/luz-cinema/releases"><img src="https://img.shields.io/github/v/release/ianfefe/luz-cinema?color=8b5cf6&label=Vers%C3%A3o" alt="Versão"></a>
+  <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-blue" alt="Windows 10/11">
   <img src="https://img.shields.io/badge/Python-3.10%2B-green" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/Licen%C3%A7a-Open%20Source-purple" alt="Open Source">
 </p>
 
 ---
 
-## 🌟 O Que Há de Novo no Luz Cinema v2?
+## Duas edições oficiais
 
-O **Luz Cinema v2** evolui o projeto de um sincronizador de lâmpada única para uma central completa de **Ambilight Multi-Canal com Zonas Espaciais e Cenários Temáticos**:
+O projeto tem um único código-fonte e gera **duas edições**, que podem até ficar instaladas lado a lado
+(cada uma tem suas próprias preferências, ícone na bandeja e início com o Windows):
 
-### 1. 🌌 Ambilight Espacial por Zonas da Tela
-Distribua suas lâmpadas pelo cômodo e mapeie cada uma para acompanhar uma região específica do monitor:
-- **Lado Esquerdo:** A lâmpada à sua esquerda reage somente ao lado esquerdo da tela (ex: sabre de luz verde, explosões ou feixes desse lado).
-- **Lado Direito:** A lâmpada à sua direita acompanha as cores da margem direita (ex: sabre de luz vermelho ou fogo).
-- **Topo / Teto:** Ilumina o quarto com o céu ou teto da cena.
-- **Tela Inteira:** Realiza a média cinematográfica harmônica do quadro.
-
-```
-       ┌──────────────────────────────┐
-       │         ZONA DO TOPO         │
-       ├──────────┬────────┬──────────┤
-       │          │        │          │
-       │ ESQUERDA │ CENTRO │ DIREITA  │
-       │          │        │          │
-       └──────────┴────────┴──────────┘
-```
-
-### 2. ✨ Sistema de Cenários de Iluminação (1 Clique)
-Alterne instantaneamente a atmosfera de todo o seu quarto com cenários pré-configurados:
-- 🎬 **Setup Cinema:** tons profundos de azul e roxo que não cansam a visão.
-- 👾 **Cyberpunk Neon:** Ciano Neon à esquerda e Magenta Vibrante à direita.
-- 🌆 **Pôr do Sol Dourado:** tons aconchegantes de laranja, âmbar e dourado.
-- 📖 **Leitura Relaxante:** luz quente aveludada (2700K) no brilho ideal para descanso.
-- 💻 **Trabalho Focado:** branco frio nítido (6500K) para concentração e produtividade.
-- 🌙 **Luz Noturna:** iluminação âmbar ultraleve (10% de brilho) para antes de dormir.
-- 🌲 **Floresta Esmeralda:** tons de verde esmeralda e menta refrescante.
-- ➕ **Crie seus Próprios Cenários:** regule suas lâmpadas, salve com um clique e acesse quando quiser.
-
-### 3. 🚀 Despacho Paralelo Assíncrono
-Envio de comandos simultâneo em canais independentes (`ThreadPoolExecutor`). Se uma lâmpada for desligada da tomada, as demais continuam sincronizando perfeitamente sem congelar o aplicativo.
-
-### 4. 🎨 Controle Individual ou Coletivo
-Na aba *Presets & Cores*, escolha controlar **Todas as Lâmpadas** juntas ou regular uma lâmpada específica (ex: apenas a luminária de mesa ou a fita LED da TV).
-
-### 5. 📌 Menu Completo na Bandeja do Windows (System Tray)
-Clique com o botão direito no ícone ao lado do relógio do Windows para:
-- Ativar qualquer **Cenário** com 1 clique.
-- Ligar ou apagar lâmpadas individuais ou todas juntas.
-- Iniciar a sincronização de cinema no monitor selecionado.
-- Escolher presets de fábrica e favoritos.
-
----
-
-## 📊 Comparativo: v1.0.0 vs v2.0.0
-
-| Recurso | Luz Cinema v1.0.0 | Luz Cinema v2.0.0 |
+| | **Luz Cinema** (Simples) | **Luz Cinema Multi** |
 | :--- | :---: | :---: |
-| **Capacidade de Lâmpadas** | 1 lâmpada | **Múltiplas lâmpadas simultâneas** |
-| **Ambilight Espacial** | Tela inteira | **Zonas (Esquerda, Direita, Topo, Inteira)** |
-| **Comunicação Concorrente** | Serial | **Assíncrona em Paralelo (Thread Pool)** |
-| **Sistema de Cenários** | Não | **7 cenários inclusos + Cenários Customizados** |
-| **Seleção de Alvo Manual** | Lâmpada única | **Individual ou Coletivo (Todas)** |
-| **Bandeja do Sistema** | Monitores & Presets | **Monitores, Cenários, Lâmpadas & Presets** |
-| **Detecção de Clarão (Flashbang)** | ✅ | ✅ |
-| **Filtro de Destaque Espectral** | ✅ | ✅ |
-| **Desligamento em Telas Pretas** | ✅ | ✅ |
-| **Início com o Windows** | ✅ | ✅ |
-| **Temas Escuro e Claro** | ✅ | ✅ |
+| Executável | `LuzCinema.exe` | `LuzCinemaMulti.exe` |
+| Código | `luz_cinema.py` | `luz_cinema_multi.py` |
+| Lâmpadas | **1 por vez** | Várias ao mesmo tempo |
+| Zonas da tela | Tela inteira | Esquerda, direita, topo, base, centro ou inteira |
+| Cenários | ✅ | ✅ (cores diferentes por zona) |
+| Preferências | `dados/preferencias_simples.json` | `dados/preferencias_multi.json` |
 
----
+> Tem só uma lâmpada? Use a **Simples**: menos opções, mais direta.
 
-## 🚀 Como Usar
+## Recursos
 
-### Opção 1: Executável Portátil Pronto (Recomendado)
-1. Acesse a aba de [Releases](https://github.com/ianfefe/luz-cinema/releases) e baixe o `LuzCinema-v2.0.0.exe` ou o arquivo compacto `LuzCinema-v2.0.0-Portable.zip`.
-2. Extraia (caso tenha baixado o zip) e abra o **`LuzCinema.exe`**.
-3. Na aba **Conectar**, vincule suas lâmpadas via QR code da Tuya (Tuya Smart, Smart Life ou Elgin) ou por Rede Local.
-4. Na aba **Cenários & Lâmpadas**, defina a zona da tela para cada lâmpada.
-5. Na aba **Cinema Multi-Lâmpadas**, clique em **Sincronizar Todas as Lâmpadas** e aproveite!
+- **Modo cinema** com prévia ao vivo do brilho em volta do monitor, botão único de iniciar/parar (ou **F5**)
+  e restauração automática da lâmpada ao estado anterior quando você para.
+- **Perfis prontos** (Ação, Escuro/Noir, Jogo FPS, Jogo RPG, Web, YouTube) e ajustes finos salvos automaticamente.
+- **Clarão** (flashes brancos a 100%), **apagar em cenas escuras/cinzas** e **modo claro** para navegar.
+- **Cores**: roda de cores, branco quente→frio, presets e cores salvas.
+- **Cenários** prontos com um clique e cenários personalizados.
+- **Bandeja do Windows**: cinema, perfis, cenários, cores, acender/apagar e sair, sem abrir a janela.
+- **Conexão** pela conta Tuya (QR code — Tuya Smart, Smart Life, Elgin Smart…) ou direto pela rede local (IP + chave).
+- Tema **escuro e claro**, interface rolável que cabe em telas de notebook.
 
-### Opção 2: A Partir do Código-Fonte (Desenvolvedores)
+## Como usar
+
+### Executável pronto
+1. Baixe em [Releases](https://github.com/ianfefe/luz-cinema/releases) e abra `LuzCinema.exe` (ou `LuzCinemaMulti.exe`).
+2. Na página **Lâmpada(s)**, vincule a conta Tuya por QR code e escolha a lâmpada — ou adicione pela rede local.
+3. Na página **Cinema**, clique em **Iniciar sincronização** e dê play no filme. Pode minimizar.
+
+### A partir do código-fonte
 
 ```bash
-# 1. Clone o repositório
 git clone https://github.com/ianfefe/luz-cinema.git
 cd luz-cinema
-
-# 2. Crie e ative o ambiente virtual
 python -m venv venv
 .\venv\Scripts\activate
-
-# 3. Instale as dependências
 pip install -r requirements.txt
-
-# 4. Inicie o Luz Cinema v2
-python luz_cinema.py
+python luz_cinema.py          # edição Simples
+python luz_cinema_multi.py    # edição Multi
 ```
 
-### Compilar seu Próprio Executável (.exe)
+### Gerar os executáveis
+
 ```bash
 pip install pyinstaller
-.\compilar.bat
+.\ferramentas\compilar.bat
 ```
 
----
+Os dois arquivos saem em `dist\`. Coloque o `.exe` na mesma pasta onde ficava a versão anterior para que as
+preferências (`dados\`) sejam importadas automaticamente.
 
-## 🔒 Segurança e Privacidade
+## Vindo da v2?
 
-- **Criptografia Local Segura (DPAPI):** Todas as credenciais locais ou tokens são protegidos usando criptografia da API de Proteção de Dados do Windows (`CryptProtectData`), vinculada exclusivamente à sua conta do usuário no Windows.
-- **Zero Vazamento de Dados:** Nenhuma informação pessoal, credencial, chave ou histórico é enviado para servidores externos além dos endpoints oficiais da Tuya Cloud requisitados pelo protocolo padrão.
-- **Código 100% Aberto e Auditável:** Todos os scripts de captura de tela, cálculo espectral e despacho de cores estão disponíveis neste repositório.
+Na primeira execução, cada edição importa `dados/preferencias_v2.json` (e a v1, se existir):
+lâmpadas, ajustes, cores e cenários. A Simples fica com a primeira lâmpada ativa. Se a v2 iniciava com o
+Windows, esse início passa para a nova edição. A chave local, que a v2 gravava em texto puro, passa a ser salva
+criptografada — depois de confirmar que tudo funciona, você pode apagar o `preferencias_v2.json` antigo.
 
----
+## Estrutura do repositório
 
-## 🧪 Testes Automatizados
+```
+luz-cinema/
+├── luz_cinema.py           ▶ abre a edição Simples
+├── luz_cinema_multi.py     ▶ abre a edição Multi
+├── requirements.txt
+├── luzcinema/              código do app (compartilhado pelas duas edições)
+│   ├── core.py             análise de cor da tela, suavização e controle local (tinytuya)
+│   ├── devices.py          cadastro de lâmpadas e envio paralelo com reconexão
+│   ├── tuya_cloud.py       controle pela nuvem Tuya
+│   ├── tuya_link.py        vinculação da conta por QR code
+│   ├── storage.py          preferências (migração e chaves protegidas por DPAPI)
+│   ├── windows.py          início com o Windows, instância única, DPAPI
+│   ├── edition.py          diferenças entre Simples e Multi
+│   ├── assets/             ícone do app
+│   └── ui/                 janela, tema, componentes, bandeja, diálogos e páginas
+├── tests/                  testes automatizados
+└── ferramentas/            compilação e manutenção
+    ├── compilar.bat / compilar.ps1 / LuzCinema.spec
+    ├── gerar_icone.py      recria o ícone
+    ├── coletar_licencas.py atualiza a pasta licencas/
+    └── licencas/           licenças das bibliotecas incluídas no .exe
+```
 
-O projeto conta com suíte completa de testes unitários para o pipeline de Ambilight, algoritmos de cor e despacho multi-lâmpadas:
+Pastas geradas localmente e ignoradas pelo Git: `venv/`, `build/`, `dist/` e `dados/`.
+
+## Segurança e privacidade
+
+- Chaves locais e tokens da Tuya ficam criptografados com a **DPAPI do Windows**, só legíveis na sua conta.
+- Nenhuma imagem da tela é salva ou enviada: a análise acontece na memória, em baixa resolução.
+- Comunicação externa apenas com os servidores oficiais da Tuya quando você usa a conexão pela conta.
+
+## Testes
 
 ```bash
-python -m unittest tests/test_luz_cinema.py tests/test_luz_cinema_v2.py
+python -m unittest discover -s tests
 ```
 
----
+## Licenças
 
-## 📄 Licenças
-Consulte a pasta `licencas/` para as licenças das bibliotecas de código aberto utilizadas.
+As licenças das bibliotecas usadas estão em `ferramentas/licencas/` (atualize com `python ferramentas/coletar_licencas.py`).
