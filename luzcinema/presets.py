@@ -1,7 +1,7 @@
-"""Presets de cores de fábrica e utilitários de cores do Luz Cinema."""
+"""Presets de cor e perfis de calibração do modo cinema."""
 from __future__ import annotations
 
-from core import cct_to_rgb, rgb_to_hex
+from .core import cct_to_rgb, rgb_to_hex
 
 DEFAULT_PRESETS = [
     {"name": "Branco Frio", "mode": "white", "temp": 100, "brightness": 100, "color_hex": "#e0f2fe"},

@@ -1,4 +1,4 @@
-"""Color processing and local bulb control. No cloud calls or image storage."""
+"""Processamento de cor da tela e controle local de lâmpadas. Sem nuvem e sem salvar imagens."""
 from __future__ import annotations
 
 import colorsys
@@ -8,6 +8,9 @@ import threading
 from dataclasses import dataclass, replace
 
 from PIL import Image
+
+SUPPORTED_VERSIONS = (3.1, 3.2, 3.3, 3.4, 3.5)
+ZONES = ("all", "left", "right", "top", "bottom", "center")
 
 
 @dataclass(frozen=True)
@@ -23,14 +26,25 @@ class Settings:
     flash_boost: bool = False     # Clarão dinâmico (100% branco) em cenas super claras (flashbang)
     light_mode: bool = False      # Modo claro: iluminar telas/páginas brancas e quentes usando LEDs brancos de alta potência
 
+    LIMITS = {"brightness": (0.05, 1), "saturation": (0, 3), "standout": (0, 1),
+              "smoothing": (0.0, 4), "interval": (0.02, 2),
+              "crop_percent": (0, 35), "dark_percent": (0, 20)}
+
     def __post_init__(self):
-        limits = {"brightness": (0.05, 1), "saturation": (0, 3), "standout": (0, 1),
-                  "smoothing": (0.0, 4), "interval": (0.02, 2),
-                  "crop_percent": (0, 35), "dark_percent": (0, 20)}
-        for field, (low, high) in limits.items():
+        for field, (low, high) in self.LIMITS.items():
             value = getattr(self, field)
             if not math.isfinite(value) or not low <= value <= high:
                 raise ValueError(f"Ajuste inválido: {field}")
+
+    @classmethod
+    def clamped(cls, **values) -> "Settings":
+        """Cria ajustes a partir de valores da interface/arquivo, limitando-os à faixa válida."""
+        for field, (low, high) in cls.LIMITS.items():
+            if field in values:
+                value = float(values[field])
+                value = low if not math.isfinite(value) else min(high, max(low, value))
+                values[field] = round(value) if field == "crop_percent" else value
+        return cls(**values)
 
 
 def srgb_to_linear(x: float) -> float:
@@ -303,175 +317,180 @@ class BulbError(Exception):
 
 
 class LocalBulb:
-    """One connection, bounded retries, thread-safe, self-healing, captured-state restore."""
+    """Controle local (LAN) de uma lâmpada Tuya: thread-safe, com reconexão e restauração do estado."""
+
+    RESTORE_FIELDS = ("switch", "mode", "brightness", "colourtemp", "colour", "scene", "scene_data")
+
     def __init__(self, device_id, ip, key, version, factory=None):
-        if not device_id.strip() or len(key.encode("utf-8")) != 16:
-            raise BulbError("Preencha o ID e a chave local de 16 bytes da lâmpada.")
+        if not str(device_id).strip() or len(str(key).encode("utf-8")) != 16:
+            raise BulbError("Preencha o ID e a chave local de 16 caracteres da lâmpada.")
         try:
-            address = ipaddress.ip_address(ip.strip())
-            if address.version != 4 or not address.is_private or address.is_loopback or address.is_unspecified or address.is_multicast or address.is_link_local:
+            address = ipaddress.ip_address(str(ip).strip())
+            if (address.version != 4 or not address.is_private or address.is_loopback
+                    or address.is_unspecified or address.is_multicast or address.is_link_local):
                 raise ValueError()
         except ValueError:
             raise BulbError("Informe o endereço IPv4 da lâmpada na sua rede local.") from None
-        if float(version) not in (3.1, 3.2, 3.3, 3.4, 3.5):
+        try:
+            parsed_version = float(version)
+        except (TypeError, ValueError):
+            parsed_version = 0.0
+        if parsed_version not in SUPPORTED_VERSIONS:
             raise BulbError("Versão de protocolo inválida.")
         if factory is None:
             import tinytuya
             factory = tinytuya.BulbDevice
 
-        self.device_id = device_id.strip()
+        self.device_id = str(device_id).strip()
         self.ip = str(address)
         self.key = key
-        self.version = float(version)
+        self.version = parsed_version
         self.factory = factory
         self._lock = threading.Lock()
-
         self.original = {}
         self.switch_dp = None
         self.off = False
-        self.device = self.factory(self.device_id, self.ip, self.key)
-
+        self.device = None
         try:
-            self.device.set_socketTimeout(1.5)
-            self.device.set_socketRetryLimit(1)
-            self.device.set_socketRetryDelay(0.1)
-            self.device.set_socketPersistent(True)
-            self.device.set_version(self.version)
-            status = self.device.status()
-            self.check(status)
-            if not isinstance(status, dict) or not isinstance(status.get("dps"), dict):
-                raise BulbError("A lâmpada não respondeu com um estado válido.")
-            if not self.device.has_colour or self.device.bulb_type not in ("A", "B"):
-                raise BulbError("Este dispositivo não apresentou controle RGB local compatível.")
-            dps = status["dps"]
-            mapping = self.device.dpset
-            self.switch_dp = str(mapping["switch"])
-            restore_fields = ("switch", "mode", "brightness", "colourtemp", "colour", "scene", "scene_data")
-            self.original = {str(mapping[k]): dps[str(mapping[k])] for k in restore_fields
-                             if mapping.get(k) and str(mapping[k]) in dps}
-            if self.switch_dp not in self.original or str(mapping["mode"]) not in self.original:
-                raise BulbError("Não foi possível ler o estado necessário para restaurar a lâmpada.")
+            self._open()
+            self._capture_unlocked(require_rgb=True)
         except Exception:
-            self.device.close()
+            self.close()
             raise
 
+    def _open(self):
+        self.device = self.factory(self.device_id, self.ip, self.key)
+        self.device.set_socketTimeout(1.5)
+        self.device.set_socketRetryLimit(1)
+        self.device.set_socketRetryDelay(0.1)
+        self.device.set_socketPersistent(True)
+        self.device.set_version(self.version)
+
+    def _capture_unlocked(self, require_rgb=False):
+        status = self.device.status()
+        self.check(status)
+        if not isinstance(status.get("dps"), dict):
+            raise BulbError("A lâmpada não respondeu com um estado válido.")
+        if require_rgb and (not self.device.has_colour or self.device.bulb_type not in ("A", "B")):
+            raise BulbError("Este dispositivo não apresentou controle RGB local compatível.")
+        dps = status["dps"]
+        mapping = self.device.dpset
+        self.switch_dp = str(mapping["switch"])
+        original = {str(mapping[k]): dps[str(mapping[k])] for k in self.RESTORE_FIELDS
+                    if mapping.get(k) and str(mapping[k]) in dps}
+        if self.switch_dp not in original or str(mapping["mode"]) not in original:
+            raise BulbError("Não foi possível ler o estado necessário para restaurar a lâmpada.")
+        self.original = original
+        self.off = not bool(dps.get(self.switch_dp, True))
+
+    def capture_state(self):
+        """Relê o estado atual da lâmpada para restaurá-lo depois (ex.: ao iniciar o cinema)."""
+        with self._lock:
+            self._with_reconnect(self._capture_unlocked)
+
     def reconnect(self) -> bool:
-        """Restaura a conexão socket com o dispositivo em caso de queda de rede."""
         with self._lock:
             return self._reconnect_unlocked()
 
     def _reconnect_unlocked(self) -> bool:
         try:
-            if hasattr(self, "device") and self.device:
-                try:
-                    self.device.close()
-                except Exception:
-                    pass
-            self.device = self.factory(self.device_id, self.ip, self.key)
-            self.device.set_socketTimeout(1.5)
-            self.device.set_socketRetryLimit(1)
-            self.device.set_socketRetryDelay(0.1)
-            self.device.set_socketPersistent(True)
-            self.device.set_version(self.version)
-            st = self.device.status()
-            return isinstance(st, dict) and "dps" in st
+            if self.device:
+                self.device.close()
+        except Exception:
+            pass
+        try:
+            self._open()
+            status = self.device.status()
+            return isinstance(status, dict) and "dps" in status
         except Exception:
             return False
 
+    def _with_reconnect(self, action, *args, **kwargs):
+        try:
+            return action(*args, **kwargs)
+        except Exception:
+            # Socket caído ou corrompido: tenta recuperar uma única vez.
+            if self._reconnect_unlocked():
+                return action(*args, **kwargs)
+            raise
+
     @staticmethod
     def check(result):
-        if result is None or not isinstance(result, dict) or "Error" in result or "Err" in result:
-            # Do not surface raw library responses: they may contain device secrets.
-            raise BulbError("Sem resposta válida da lâmpada. Confira IP, chave e protocolo; feche o Elgin Smart e tente novamente.")
+        if not isinstance(result, dict) or "Error" in result or "Err" in result:
+            # Não exibe a resposta crua da biblioteca: ela pode conter segredos do dispositivo.
+            raise BulbError("Sem resposta válida da lâmpada. Confira IP, chave e protocolo; feche o app do fabricante e tente novamente.")
 
-    is_white_candidate = staticmethod(is_white_cct_candidate)
+    def _white(self, brightness_pct, temp_pct):
+        if hasattr(self.device, "set_white_percentage"):
+            self.check(self.device.set_white_percentage(int(brightness_pct), int(temp_pct)))
+        else:
+            self.check(self.device.set_mode("white"))
+            self.check(self.device.set_brightness_percentage(int(brightness_pct)))
+        self.off = False
 
-    @staticmethod
-    def calc_cct_pct(rgb):
-        return calc_cct_values(rgb, 100, 100)
+    def _colour(self, rgb):
+        self.check(self.device.set_colour(*rgb))
+        self.off = False
+
+    def _turn_off(self):
+        if not self.off:
+            self.check(self.device.turn_off())
+            self.off = True
 
     def color(self, rgb, light_mode=False):
+        """Envia uma cor do modo cinema (preto apaga; clarão e páginas claras usam LEDs brancos)."""
         with self._lock:
-            try:
-                self._send_color_internal(rgb, light_mode=light_mode)
-            except Exception:
-                # Se falhar por queda de conexão ou socket corrompido, tenta auto-recuperar uma vez
-                if self._reconnect_unlocked():
-                    self._send_color_internal(rgb, light_mode=light_mode)
-                else:
-                    raise
+            self._with_reconnect(self._send_frame, rgb, light_mode)
 
-    def _send_color_internal(self, rgb, light_mode=False):
+    def _send_frame(self, rgb, light_mode):
         if max(rgb) <= 2:
-            if not self.off:
-                self.check(self.device.turn_off())
-                self.off = True
+            self._turn_off()
         elif min(rgb) >= 245:
-            # Flashbang: dispara LEDs brancos de alta potência (Branco Frio / 100%)
-            if hasattr(self.device, "set_white_percentage"):
-                self.check(self.device.set_white_percentage(100, 100))
-            elif hasattr(self.device, "set_mode"):
-                self.check(self.device.set_mode("white"))
-                if hasattr(self.device, "set_brightness_percentage"):
-                    self.check(self.device.set_brightness_percentage(100))
-            else:
-                self.check(self.device.set_colour(*rgb))
-            self.off = False
-        elif light_mode and self.is_white_candidate(rgb):
-            bright_pct, temp_pct = self.calc_cct_pct(rgb)
-            if hasattr(self.device, "set_white_percentage"):
-                self.check(self.device.set_white_percentage(bright_pct, temp_pct))
-            elif hasattr(self.device, "set_mode"):
-                self.check(self.device.set_mode("white"))
-                if hasattr(self.device, "set_brightness_percentage"):
-                    self.check(self.device.set_brightness_percentage(bright_pct))
-            else:
-                self.check(self.device.set_colour(*rgb))
-            self.off = False
+            self._white(100, 100)
+        elif light_mode and is_white_cct_candidate(rgb):
+            self._white(*calc_cct_values(rgb, 100, 100))
         else:
-            self.check(self.device.set_colour(*rgb))
-            self.off = False
+            self._colour(rgb)
 
     def set_manual(self, mode, rgb=None, brightness=100, temp=100):
         with self._lock:
-            try:
-                self._send_manual_internal(mode, rgb=rgb, brightness=brightness, temp=temp)
-            except Exception:
-                if self._reconnect_unlocked():
-                    self._send_manual_internal(mode, rgb=rgb, brightness=brightness, temp=temp)
-                else:
-                    raise
+            self._with_reconnect(self._send_manual, mode, rgb, brightness, temp)
 
-    def _send_manual_internal(self, mode, rgb=None, brightness=100, temp=100):
+    def _send_manual(self, mode, rgb, brightness, temp):
         if mode == "off":
             self.check(self.device.turn_off())
             self.off = True
         elif mode == "white":
-            if hasattr(self.device, "set_white_percentage"):
-                self.check(self.device.set_white_percentage(int(brightness), int(temp)))
-            elif hasattr(self.device, "set_mode"):
-                self.check(self.device.set_mode("white"))
-                if hasattr(self.device, "set_brightness_percentage"):
-                    self.check(self.device.set_brightness_percentage(int(brightness)))
-            self.off = False
+            self._white(brightness, temp)
         elif rgb:
-            self.check(self.device.set_colour(*rgb))
-            self.off = False
+            self._colour(rgb)
 
     def restore(self):
         with self._lock:
             if self.original:
                 try:
-                    self.check(self.device.set_multiple_values(self.original))
+                    self._with_reconnect(lambda: self.check(self.device.set_multiple_values(self.original)))
                 except Exception:
                     pass
 
     def close(self):
         with self._lock:
             try:
-                self.device.close()
+                if self.device:
+                    self.device.close()
             except Exception:
                 pass
+
+
+def downscale_frame(frame: Image.Image, width: int = 320) -> Image.Image:
+    """Reduz a captura uma única vez antes de recortar as zonas (bem mais rápido em telas 4K)."""
+    if frame.mode != "RGB":
+        frame = frame.convert("RGB")
+    w, h = frame.size
+    if w <= width:
+        return frame
+    height = max(1, round(h * width / w))
+    return frame.resize((width, height), resample=getattr(Image, "BOX", Image.BILINEAR))
 
 
 def crop_zone(frame: Image.Image, zone: str, crop_percent: int = 10) -> Image.Image:

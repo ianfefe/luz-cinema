@@ -21,6 +21,8 @@ preferencias.json
 preferencias_v2.json
 dados/preferencias.json
 dados/preferencias_v2.json
+dados/
+*.tmp
 
 # Binários pesados gerados localmente (distribuídos via GitHub Releases)
 *.exe

@@ -1,14 +1,14 @@
-"""Utilitários de geração e renderização de ícones para janela, bandeja e roda de cores."""
+"""Ícones da janela e da bandeja e a imagem da roda de cores."""
 from __future__ import annotations
 
 import colorsys
 import math
 from pathlib import Path
-import sys
 
 from PIL import Image, ImageDraw, ImageFilter
-from core import hex_to_rgb
-from win_platform import APP_DIR
+from ..core import hex_to_rgb
+
+ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 
 
 def create_color_wheel_image(size: int) -> Image.Image:
@@ -109,10 +109,6 @@ def export_ico(path: Path):
 
 
 def get_icon_file() -> Path | None:
-    """Localiza o arquivo luzcinema.ico no executável empacotado ou no diretório do projeto."""
-    for base in (getattr(sys, "_MEIPASS", None), APP_DIR, Path(__file__).parent):
-        if base:
-            p = Path(base) / "luzcinema.ico"
-            if p.exists():
-                return p
-    return None
+    """Localiza o luzcinema.ico (dentro do executável empacotado ou em luzcinema/assets)."""
+    p = ASSETS_DIR / "luzcinema.ico"
+    return p if p.exists() else None
