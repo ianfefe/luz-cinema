@@ -214,7 +214,7 @@ class ScreenPreview(tk.Canvas):
     """Ilustração do monitor com o brilho ambiente ao redor, atualizada em tempo real.
 
     O brilho é desenhado com Pillow em baixa resolução e desfocado, o que dá um degradê suave.
-    Na edição Multi cada lado brilha com a cor da sua zona e as zonas aparecem dentro da tela.
+    Com várias lâmpadas cada lado brilha com a cor da sua zona e as zonas aparecem dentro da tela.
     """
 
     DOWNSCALE = 4
@@ -230,6 +230,11 @@ class ScreenPreview(tk.Canvas):
         self._glow_key = None
         self.bind("<Configure>", lambda _: self._draw())
         theme.bind(lambda t: self._draw())
+
+    def set_show_zones(self, show: bool):
+        if show != self.show_zones:
+            self.show_zones = show
+            self._draw()
 
     def set_colors(self, zone_colors: dict[str, tuple[int, int, int]] | None):
         """Atualiza as cores (None = parado)."""

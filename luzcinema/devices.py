@@ -1,7 +1,6 @@
 """Cadastro de lâmpadas e despacho paralelo de cores (local ou nuvem Tuya).
 
-O mesmo controlador atende as duas edições: a Simples usa uma única lâmpada
-na zona "all"; a Multi distribui várias lâmpadas pelas zonas da tela.
+Com uma lâmpada ela fica na zona "all"; com várias, cada uma acompanha a sua zona da tela.
 """
 from __future__ import annotations
 

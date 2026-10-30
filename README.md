@@ -14,21 +14,14 @@
 
 ---
 
-## Duas edições oficiais
+## Uma lâmpada ou várias
 
-O projeto tem um único código-fonte e gera **duas edições**, que podem até ficar instaladas lado a lado
-(cada uma tem suas próprias preferências, ícone na bandeja e início com o Windows):
+É um app só, que se adapta ao que você tem:
 
-| | **Luz Cinema** (Simples) | **Luz Cinema Multi** |
-| :--- | :---: | :---: |
-| Executável | `LuzCinema.exe` | `LuzCinemaMulti.exe` |
-| Código | `luz_cinema.py` | `luz_cinema_multi.py` |
-| Lâmpadas | **1 por vez** | Várias ao mesmo tempo |
-| Zonas da tela | Tela inteira | Esquerda, direita, topo, base, centro ou inteira |
-| Cenários | ✅ | ✅ (cores diferentes por zona) |
-| Preferências | `dados/preferencias_simples.json` | `dados/preferencias_multi.json` |
-
-> Tem só uma lâmpada? Use a **Simples**: menos opções, mais direta.
+- **Uma lâmpada**: interface enxuta — a lâmpada acompanha a tela inteira.
+- **Duas ou mais**: aparecem as **zonas da tela** (esquerda, direita, topo, base, centro ou inteira),
+  a cor de cada lâmpada na prévia, o seletor “Aplicar em” nas cores e um submenu por lâmpada na bandeja.
+  Os cenários dão uma cor diferente para cada zona.
 
 ## Recursos
 
@@ -45,8 +38,8 @@ O projeto tem um único código-fonte e gera **duas edições**, que podem até 
 ## Como usar
 
 ### Executável pronto
-1. Baixe em [Releases](https://github.com/ianfefe/luz-cinema/releases) e abra `LuzCinema.exe` (ou `LuzCinemaMulti.exe`).
-2. Na página **Lâmpada(s)**, vincule a conta Tuya por QR code e escolha a lâmpada — ou adicione pela rede local.
+1. Baixe em [Releases](https://github.com/ianfefe/luz-cinema/releases) e abra `LuzCinema.exe`.
+2. Na página **Lâmpadas**, vincule a conta Tuya por QR code e escolha a lâmpada — ou adicione pela rede local.
 3. Na página **Cinema**, clique em **Iniciar sincronização** e dê play no filme. Pode minimizar.
 
 ### A partir do código-fonte
@@ -57,42 +50,40 @@ cd luz-cinema
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
-python luz_cinema.py          # edição Simples
-python luz_cinema_multi.py    # edição Multi
+python luz_cinema.py
 ```
 
-### Gerar os executáveis
+### Gerar o executável
 
 ```bash
 pip install pyinstaller
 .\ferramentas\compilar.bat
 ```
 
-Os dois arquivos saem em `dist\`. Coloque o `.exe` na mesma pasta onde ficava a versão anterior para que as
+O arquivo sai em `dist\LuzCinema.exe`. Coloque o `.exe` na mesma pasta onde ficava a versão anterior para que as
 preferências (`dados\`) sejam importadas automaticamente.
 
-## Vindo da v2?
+## Vindo de uma versão anterior?
 
-Na primeira execução, cada edição importa `dados/preferencias_v2.json` (e a v1, se existir):
-lâmpadas, ajustes, cores e cenários. A Simples fica com a primeira lâmpada ativa. Se a v2 iniciava com o
-Windows, esse início passa para a nova edição. A chave local, que a v2 gravava em texto puro, passa a ser salva
-criptografada — depois de confirmar que tudo funciona, você pode apagar o `preferencias_v2.json` antigo.
+Na primeira execução, o app importa as preferências antigas da pasta `dados/` — das edições Simples/Multi
+da 3.0 (`preferencias_simples.json`, depois `preferencias_multi.json`), da v2 (`preferencias_v2.json`) ou da v1:
+lâmpadas, ajustes, cores e cenários. Tudo passa a ficar em `dados/preferencias_v3.json`. Se a v2 ou a edição
+Multi iniciava com o Windows, esse início passa para o `LuzCinema.exe`. A chave local, que a v2 gravava em texto
+puro, passa a ser salva criptografada — depois de confirmar que tudo funciona, você pode apagar os arquivos antigos.
 
 ## Estrutura do repositório
 
 ```
 luz-cinema/
-├── luz_cinema.py           ▶ abre a edição Simples
-├── luz_cinema_multi.py     ▶ abre a edição Multi
+├── luz_cinema.py           ▶ abre o app
 ├── requirements.txt
-├── luzcinema/              código do app (compartilhado pelas duas edições)
+├── luzcinema/              código do app
 │   ├── core.py             análise de cor da tela, suavização e controle local (tinytuya)
 │   ├── devices.py          cadastro de lâmpadas e envio paralelo com reconexão
 │   ├── tuya_cloud.py       controle pela nuvem Tuya
 │   ├── tuya_link.py        vinculação da conta por QR code
 │   ├── storage.py          preferências (migração e chaves protegidas por DPAPI)
 │   ├── windows.py          início com o Windows, instância única, DPAPI
-│   ├── edition.py          diferenças entre Simples e Multi
 │   ├── assets/             ícone do app
 │   └── ui/                 janela, tema, componentes, bandeja, diálogos e páginas
 ├── tests/                  testes automatizados
