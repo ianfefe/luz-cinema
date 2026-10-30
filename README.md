@@ -66,7 +66,7 @@ preferências (`dados\`) sejam importadas automaticamente.
 ## Vindo de uma versão anterior?
 
 Na primeira execução, o app importa as preferências antigas da pasta `dados/` — das edições Simples/Multi
-da 3.0 (`preferencias_simples.json`, depois `preferencias_multi.json`), da v2 (`preferencias_v2.json`) ou da v1:
+de testes da 3.0 (`preferencias_simples.json`, depois `preferencias_multi.json`), da v2 (`preferencias_v2.json`) ou da v1:
 lâmpadas, ajustes, cores e cenários. Tudo passa a ficar em `dados/preferencias_v3.json`. Se a v2 ou a edição
 Multi iniciava com o Windows, esse início passa para o `LuzCinema.exe`. A chave local, que a v2 gravava em texto
 puro, passa a ser salva criptografada — depois de confirmar que tudo funciona, você pode apagar os arquivos antigos.

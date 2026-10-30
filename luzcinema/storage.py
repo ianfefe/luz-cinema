@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 SCHEMA = 3
 CONFIG_NAME = "preferencias_v3.json"
-# Arquivos das edições Simples/Multi (3.0), em ordem de preferência na migração.
+# Arquivos das edições Simples/Multi (pré-lançamento da 3.0), em ordem de preferência na migração.
 LEGACY_EDITIONS = ("preferencias_simples.json", "preferencias_multi.json")
 LEGACY_V2 = "preferencias_v2.json"
 LEGACY_V1 = "preferencias.json"
